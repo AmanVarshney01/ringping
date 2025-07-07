@@ -1,4 +1,5 @@
 import { protectedProcedure, publicProcedure } from "../lib/orpc";
+import { ringtoneRouter } from "./ringtone";
 import { todoRouter } from "./todo";
 
 export const appRouter = {
@@ -12,5 +13,6 @@ export const appRouter = {
 		};
 	}),
 	todo: todoRouter,
+	ringtone: ringtoneRouter,
 };
 export type AppRouter = typeof appRouter;
