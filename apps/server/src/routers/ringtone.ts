@@ -1,14 +1,18 @@
 import { ORPCError } from "@orpc/server";
 import { exec } from "child_process";
+import crypto from "crypto";
+import { eq } from "drizzle-orm";
 import fs from "fs/promises";
 import path from "path";
 import { promisify } from "util";
 import z from "zod/v4";
-import { publicProcedure } from "../lib/orpc";
+import { db } from "../db";
+import { ringtone } from "../db/schema/ringtone";
+import { protectedProcedure } from "../lib/orpc";
 
 const execAsync = promisify(exec);
 
-const createRingtone = publicProcedure
+const createRingtone = protectedProcedure
 	.input(
 		z.object({
 			url: z.url("Please enter a valid URL"),
@@ -21,38 +25,55 @@ const createRingtone = publicProcedure
 			fileName: z.string().min(1, "File name is required"),
 		}),
 	)
-	.handler(async ({ input }) => {
+	.handler(async ({ input, context }) => {
 		const { url, startTime, endTime, fileName } = input;
+		const userId = context.session.user.id;
 
-		const outputDir = path.join(process.cwd(), "public", "downloads");
+		const outputDir = path.join(process.cwd(), "public", "downloads", userId);
 		await fs.mkdir(outputDir, { recursive: true });
 
-		const randomId = Math.random().toString(36).substring(7);
-		const audioPath = path.join(outputDir, `${randomId}.mp3`);
-		const ringtonePath = path.join(outputDir, `${fileName}.mp3`);
+		const ringtoneId = crypto.randomUUID();
+		const tempAudioPath = path.join(outputDir, `${ringtoneId}_temp.mp3`);
+		const finalRingtonePath = path.join(outputDir, `${fileName}.mp3`);
+		const downloadUrl = `/downloads/${userId}/${fileName}.mp3`;
 
 		try {
+			// Download audio using yt-dlp
 			await execAsync(
-				`yt-dlp -x --audio-format mp3 -o "${audioPath}" "${url}"`,
+				`yt-dlp -x --audio-format mp3 -o "${tempAudioPath}" "${url}"`,
 			);
 
+			// Trim audio using ffmpeg
 			await execAsync(
-				`ffmpeg -i "${audioPath}" -ss ${startTime} -to ${endTime} -c copy "${ringtonePath}"`,
+				`ffmpeg -i "${tempAudioPath}" -ss ${startTime} -to ${endTime} -c copy "${finalRingtonePath}"`,
 			);
 
-			await fs.unlink(audioPath);
+			// Clean up original download
+			await fs.unlink(tempAudioPath);
+
+			// Save to database
+			await db.insert(ringtone).values({
+				id: ringtoneId,
+				fileName,
+				originalUrl: url,
+				startTime,
+				endTime,
+				downloadUrl,
+				userId,
+			});
 
 			return {
-				downloadUrl: `/downloads/${fileName}.mp3`,
+				downloadUrl: downloadUrl,
 			};
 		} catch (error) {
-			console.error(error);
+			console.error("Error creating ringtone:", error);
+			// Clean up files if an error occurs
 			try {
-				if (await fs.stat(audioPath)) {
-					await fs.unlink(audioPath);
+				if (await fs.stat(tempAudioPath)) {
+					await fs.unlink(tempAudioPath);
 				}
-				if (await fs.stat(ringtonePath)) {
-					await fs.unlink(ringtonePath);
+				if (await fs.stat(finalRingtonePath)) {
+					await fs.unlink(finalRingtonePath);
 				}
 			} catch (cleanupError) {
 				console.error("Cleanup error:", cleanupError);
@@ -63,6 +84,12 @@ const createRingtone = publicProcedure
 		}
 	});
 
+const getRingtones = protectedProcedure.handler(async ({ context }) => {
+	const userId = context.session.user.id;
+	return db.select().from(ringtone).where(eq(ringtone.userId, userId));
+});
+
 export const ringtoneRouter = {
 	create: createRingtone,
+	getAll: getRingtones,
 };
