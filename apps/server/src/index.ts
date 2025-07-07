@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { RPCHandler } from "@orpc/server/fetch";
 import { Hono } from "hono";
+import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { auth } from "./lib/auth";
@@ -19,6 +20,8 @@ app.use(
 		credentials: true,
 	}),
 );
+
+app.use("/downloads/*", serveStatic({ root: "./public" }));
 
 app.on(["POST", "GET"], "/api/auth/**", (c) => auth.handler(c.req.raw));
 
