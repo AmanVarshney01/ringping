@@ -67,13 +67,13 @@ function RouteComponent() {
     },
     validators: {
       onSubmit: z.object({
-        url: z.string().url("Please enter a valid URL"),
+        url: z.url("Please enter a valid URL"),
         startTime: z
           .string()
-          .regex(/^\\d{2}:\\d{2}:\\d{2}$/, "Invalid time format (HH:MM:SS)"),
+          .regex(/^\d{2}:\d{2}:\d{2}$/, "Invalid time format (HH:MM:SS)"),
         endTime: z
           .string()
-          .regex(/^\\d{2}:\\d{2}:\\d{2}$/, "Invalid time format (HH:MM:SS)"),
+          .regex(/^\d{2}:\d{2}:\d{2}$/, "Invalid time format (HH:MM:SS)"),
         fileName: z.string().min(1, "File name cannot be empty"),
       }),
     },
@@ -257,6 +257,7 @@ function RouteComponent() {
                         <a
                           href={`${import.meta.env.VITE_SERVER_URL}${ringtone.downloadUrl}`}
                           download
+                          target="_blank"
                         >
                           Download
                         </a>
