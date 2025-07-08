@@ -221,7 +221,7 @@ function RouteComponent() {
 	}
 
 	return (
-		<div className="min-h-screen bg-background">
+		<div className="h-full bg-background">
 			<div className="container mx-auto max-w-2xl px-4 py-8">
 				<div className="mb-12 text-center">
 					<div className="mb-4 flex justify-center">
@@ -236,39 +236,6 @@ function RouteComponent() {
 							: "Create ringtones from any video - free and easy!"}
 					</p>
 				</div>
-
-				{session?.user.isAnonymous && (
-					<div className="mb-8 rounded-xl border border-blue-200 bg-blue-50 p-6 dark:border-blue-800 dark:bg-blue-900/20">
-						<div className="flex items-start space-x-3">
-							<div className="flex-shrink-0">
-								<Music className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-							</div>
-							<div className="flex-1">
-								<h3 className="font-medium text-blue-900 dark:text-blue-100">
-									Free Ringtone Creation
-								</h3>
-								<p className="mt-1 text-blue-800 text-sm dark:text-blue-200">
-									You're using anonymous mode. Your ringtones are saved
-									temporarily and can be downloaded from your dashboard.
-								</p>
-								<div className="mt-4 flex items-center space-x-3">
-									<Button
-										size="sm"
-										onClick={() => navigate({ to: "/login" })}
-										className="bg-blue-600 text-white hover:bg-blue-700"
-									>
-										<UserPlus className="mr-2 h-4 w-4" />
-										Sign Up to Save Permanently
-									</Button>
-									<span className="text-blue-700 text-sm dark:text-blue-300">
-										Create an account to keep your ringtones forever
-									</span>
-								</div>
-							</div>
-						</div>
-					</div>
-				)}
-
 				<div className="mb-12 rounded-xl border border-border bg-card p-8 shadow-sm">
 					<form
 						onSubmit={(e) => {

@@ -9,6 +9,7 @@ import z from "zod/v4";
 import { db } from "../db";
 import { ringtone } from "../db/schema/ringtone";
 import { protectedProcedure, publicProcedure } from "../lib/orpc";
+import { desc } from "drizzle-orm";
 
 const getVideoInfo = protectedProcedure
 	.input(
@@ -150,7 +151,8 @@ const getRingtones = protectedProcedure.handler(async ({ context }) => {
 	const userRingtones = await db
 		.select()
 		.from(ringtone)
-		.where(eq(ringtone.userId, userId));
+		.where(eq(ringtone.userId, userId))
+		.orderBy(desc(ringtone.createdAt));
 
 	consola.info("Found ringtones:", userRingtones.length);
 

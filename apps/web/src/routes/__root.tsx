@@ -1,7 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-
 import {
 	createRootRouteWithContext,
 	HeadContent,
@@ -12,6 +10,7 @@ import {
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import Loader from "@/components/loader";
 import { Toaster } from "@/components/ui/sonner";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { orpc } from "@/utils/orpc";
 import Header from "../components/header";
 import appCss from "../index.css?url";
@@ -56,7 +55,9 @@ function RootDocument() {
 			<body>
 				<div className="grid h-svh grid-rows-[auto_1fr]">
 					<Header />
-					{isFetching ? <Loader /> : <Outlet />}
+					<ScrollArea className="h-full overflow-hidden">
+						{isFetching ? <Loader /> : <Outlet />}
+					</ScrollArea>
 				</div>
 				<Toaster richColors />
 				<TanStackRouterDevtools position="bottom-left" />
