@@ -37,11 +37,34 @@ function RouteComponent() {
 		uploader: string;
 	} | null>(null);
 
+	// Helper to create a safe default file name from the video title
+	const createSafeFileName = (title: string) =>
+		title
+			// Remove invalid filename characters
+			.replace(/[<>:"/\\|?*]/g, "")
+			// Collapse whitespace
+			.replace(/\s+/g, " ")
+			// Trim and limit length
+			.trim()
+			.slice(0, 50) || "ringtone";
+
 	useEffect(() => {
 		if (!isSessionPending && !session) {
 			navigate({ to: "/login" });
 		}
 	}, [isSessionPending, session, navigate]);
+
+	useEffect(() => {
+		if (videoInfo) {
+			const maxStart = Math.max(0, Math.min(videoInfo.duration - 10, videoInfo.duration * 0.1));
+			form.setFieldValue('startSeconds', Math.floor(maxStart));
+			form.setFieldValue('endSeconds', Math.floor(maxStart) + 10);
+			// Pre-fill the file name with a sanitized video title if the user hasn't typed anything yet
+			if (form.state.values.fileName === 'ringtone' || !form.state.values.fileName) {
+				form.setFieldValue('fileName', createSafeFileName(videoInfo.title));
+			}
+		}
+	}, [videoInfo]);
 
 	const ringtonesQuery = useQuery(
 		orpc.ringtone.getAll.queryOptions({
@@ -79,28 +102,34 @@ function RouteComponent() {
 		}),
 	);
 
-	const convertTimeStringToSeconds = (timeString: string) => {
-		const [hours, minutes, seconds] = timeString.split(":").map(Number);
-		return hours * 3600 + minutes * 60 + seconds;
+	const secondsToHms = (d: number) => {
+		const dur = Number(d);
+		const h = Math.floor(dur / 3600);
+		const m = Math.floor((dur % 3600) / 60);
+		const s = Math.floor((dur % 3600) % 60);
+		return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 	};
 
-	const formatDuration = (seconds: number) => {
-		const h = Math.floor(seconds / 3600);
-		const m = Math.floor((seconds % 3600) / 60);
-		const s = Math.floor(seconds % 60);
-		return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+	const hmsToSeconds = (s: string) => {
+		const [h, m, sec] = s.split(":").map(Number);
+		return h * 3600 + m * 60 + sec;
 	};
 
 	const form = useForm({
 		defaultValues: {
 			url: "",
-			startTime: "00:00:00",
-			endTime: "00:00:10",
+			startSeconds: 0,
+			endSeconds: 10,
 			fileName: "ringtone",
 		},
 		onSubmit: async ({ value }) => {
+			const durationSeconds = value.endSeconds - value.startSeconds;
+
 			createMutation.mutate({
-				...value,
+				url: value.url,
+				startSeconds: value.startSeconds,
+				durationSeconds,
+				fileName: value.fileName,
 				videoDuration: videoInfo?.duration,
 			});
 		},
@@ -108,71 +137,44 @@ function RouteComponent() {
 			onSubmit: z
 				.object({
 					url: z.string().url("Please enter a valid URL"),
-					startTime: z
-						.string()
-						.regex(
-							/^([0-9]{2}):([0-5][0-9]):([0-5][0-9])$/,
-							"Invalid time format (HH:MM:SS)",
-						),
-					endTime: z
-						.string()
-						.regex(
-							/^([0-9]{2}):([0-5][0-9]):([0-5][0-9])$/,
-							"Invalid time format (HH:MM:SS)",
-						),
+					startSeconds: z.number().min(0, "Start time must be 0 or greater"),
+					endSeconds: z.number().min(1, "End time must be greater than 0"),
 					fileName: z
 						.string()
 						.min(1, "File name cannot be empty")
+						.max(50, "File name too long")
 						.refine((name) => !/[<>:"/\\|?*]/.test(name), {
 							message: "File name contains invalid characters",
 						}),
 				})
 				.refine(
 					(data) => {
-						const startSeconds = convertTimeStringToSeconds(data.startTime);
-						const endSeconds = convertTimeStringToSeconds(data.endTime);
-						return endSeconds > startSeconds;
+						return data.endSeconds > data.startSeconds;
 					},
 					{
 						message: "End time must be after start time",
-						path: ["endTime"],
+						path: ["endSeconds"],
 					},
 				)
 				.refine(
 					(data) => {
-						const startSeconds = convertTimeStringToSeconds(data.startTime);
-						const endSeconds = convertTimeStringToSeconds(data.endTime);
-						return endSeconds - startSeconds <= 60;
+						return data.endSeconds - data.startSeconds <= 60;
 					},
 					{
 						message: "Ringtone duration should be 60 seconds or less",
-						path: ["endTime"],
+						path: ["endSeconds"],
 					},
 				)
 				.refine(
 					(data) => {
 						if (!videoInfo?.duration) return true;
-						const endSeconds = convertTimeStringToSeconds(data.endTime);
-						return endSeconds <= videoInfo.duration;
+						return data.endSeconds <= videoInfo.duration;
 					},
 					{
 						message: videoInfo?.duration
-							? `End time cannot exceed video duration (${formatDuration(videoInfo.duration)})`
+							? `End time cannot exceed video duration (${secondsToHms(videoInfo.duration)})`
 							: "End time exceeds video duration",
-						path: ["endTime"],
-					},
-				)
-				.refine(
-					(data) => {
-						if (!videoInfo?.duration) return true;
-						const startSeconds = convertTimeStringToSeconds(data.startTime);
-						return startSeconds <= videoInfo.duration;
-					},
-					{
-						message: videoInfo?.duration
-							? `Start time cannot exceed video duration (${formatDuration(videoInfo.duration)})`
-							: "Start time exceeds video duration",
-						path: ["startTime"],
+						path: ["endSeconds"],
 					},
 				),
 		},
@@ -280,7 +282,7 @@ function RouteComponent() {
 											By {videoInfo.uploader}
 										</p>
 										<p className="font-medium text-primary text-sm">
-											Duration: {formatDuration(videoInfo.duration)}
+											Duration: {secondsToHms(videoInfo.duration)}
 										</p>
 									</div>
 								</div>
@@ -292,73 +294,58 @@ function RouteComponent() {
 								<AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
 								<p className="text-sm text-yellow-800 dark:text-yellow-200">
 									This video is quite short (
-									{formatDuration(videoInfo.duration)}). Make sure your ringtone
+									{secondsToHms(videoInfo.duration)}). Make sure your ringtone
 									times fit within this duration.
 								</p>
 							</div>
 						)}
 
-						<div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-							<form.Field name="startTime">
-								{(field) => (
-									<div className="space-y-3">
-										<TimePicker
-											id={field.name}
-											label="Start Time"
-											value={field.state.value}
-											onChange={field.handleChange}
-										/>
-										{field.state.meta.errors.map((error) => (
-											<p key={error?.message} className="text-red-500 text-sm">
-												{error?.message}
-											</p>
-										))}
-									</div>
-								)}
-							</form.Field>
-
-							<form.Field name="endTime">
-								{(field) => (
-									<div className="space-y-3">
-										<TimePicker
-											id={field.name}
-											label="End Time"
-											value={field.state.value}
-											onChange={field.handleChange}
-										/>
-										{field.state.meta.errors.map((error) => (
-											<p key={error?.message} className="text-red-500 text-sm">
-												{error?.message}
-											</p>
-										))}
-									</div>
-								)}
-							</form.Field>
-						</div>
-
-						<form.Field name="fileName">
-							{(field) => (
-								<div className="space-y-3">
-									<Label htmlFor={field.name} className="font-medium text-base">
-										File Name
-									</Label>
-									<Input
-										id={field.name}
-										name={field.name}
-										type="text"
-										value={field.state.value}
-										onBlur={field.handleBlur}
-										onChange={(e) => field.handleChange(e.target.value)}
-										className="h-12 text-base"
+						{videoInfo && (
+							<div className="space-y-6">
+								<div className="flex justify-around items-center gap-4">
+									<TimePicker
+										label="Start Time"
+										value={secondsToHms(form.state.values.startSeconds)}
+										onChange={(value) =>
+											form.setFieldValue("startSeconds", hmsToSeconds(value))
+										}
 									/>
-									{field.state.meta.errors.map((error) => (
-										<p key={error?.message} className="text-red-500 text-sm">
-											{error?.message}
-										</p>
-									))}
+									<TimePicker
+										label="End Time"
+										value={secondsToHms(form.state.values.endSeconds)}
+										onChange={(value) =>
+											form.setFieldValue("endSeconds", hmsToSeconds(value))
+										}
+									/>
 								</div>
-							)}
-						</form.Field>
+							</div>
+						)}
+
+						{videoInfo && (
+							<form.Field name="fileName">
+								{(field) => (
+									<div className="space-y-3">
+										<Label htmlFor={field.name} className="font-medium text-base">
+											File Name
+										</Label>
+										<Input
+											id={field.name}
+											name={field.name}
+											type="text"
+											value={field.state.value}
+											onBlur={field.handleBlur}
+											onChange={(e) => field.handleChange(e.target.value)}
+											className="h-12 text-base"
+										/>
+										{field.state.meta.errors.map((error) => (
+											<p key={error?.message} className="text-red-500 text-sm">
+												{error?.message}
+											</p>
+										))}
+									</div>
+								)}
+							</form.Field>
+						)}
 
 						<form.Subscribe>
 							{(state) => (
@@ -415,7 +402,7 @@ function RouteComponent() {
 												{ringtone.fileName}.mp3
 											</p>
 											<p className="text-muted-foreground text-sm">
-												{ringtone.startTime} → {ringtone.endTime}
+												{secondsToHms(Number.parseInt(ringtone.startTime, 10))} → {secondsToHms(Number.parseInt(ringtone.endTime, 10))}
 											</p>
 										</div>
 									</div>
