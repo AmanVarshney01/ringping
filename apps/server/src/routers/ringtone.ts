@@ -8,7 +8,7 @@ import { execa } from "execa";
 import z from "zod/v4";
 import { db } from "../db";
 import { ringtone } from "../db/schema/ringtone";
-import { protectedProcedure } from "../lib/orpc";
+import { protectedProcedure, publicProcedure } from "../lib/orpc";
 
 const getVideoInfo = protectedProcedure
 	.input(
@@ -92,17 +92,15 @@ const createRingtone = protectedProcedure
 				userId,
 			});
 
-			// Direct download of specific time range using seconds (more reliable)
 			consola.info("Downloading time range:", { startSeconds, endSeconds });
 			await execa(
 				`yt-dlp -x --audio-format mp3 --audio-quality 192K --download-sections "*${startSeconds}-${endSeconds}" -o "${outputPath}" "${url}"`,
 				{
 					shell: true,
-					timeout: 120000, // 2 minute timeout
+					timeout: 120000,
 				},
 			);
 
-			// Verify file was created and has content
 			const stats = await fs.stat(outputPath);
 			if (stats.size === 0) {
 				throw new Error("Generated file is empty");
@@ -133,7 +131,6 @@ const createRingtone = protectedProcedure
 		} catch (error) {
 			consola.error("Error creating ringtone:", error);
 
-			// Cleanup on failure
 			try {
 				await fs.unlink(outputPath);
 			} catch (cleanupError) {
@@ -160,8 +157,128 @@ const getRingtones = protectedProcedure.handler(async ({ context }) => {
 	return userRingtones;
 });
 
+const updateRingtone = protectedProcedure
+	.input(
+		z.object({
+			id: z.string(),
+			fileName: z
+				.string()
+				.min(1, "File name is required")
+				.max(50, "File name too long"),
+		}),
+	)
+	.handler(async ({ input, context }) => {
+		const { id, fileName } = input;
+		const userId = context.session.user.id;
+
+		try {
+			consola.info("Updating ringtone:", { id, fileName, userId });
+
+			const existingRingtone = await db
+				.select()
+				.from(ringtone)
+				.where(eq(ringtone.id, id))
+				.limit(1);
+
+			if (existingRingtone.length === 0) {
+				throw new ORPCError("NOT_FOUND", {
+					message: "Ringtone not found",
+				});
+			}
+
+			if (existingRingtone[0].userId !== userId) {
+				throw new ORPCError("FORBIDDEN", {
+					message: "You can only update your own ringtones",
+				});
+			}
+
+			await db
+				.update(ringtone)
+				.set({
+					fileName,
+					updatedAt: new Date(),
+				})
+				.where(eq(ringtone.id, id));
+
+			consola.success("Ringtone updated successfully:", { id, fileName });
+
+			return { success: true };
+		} catch (error) {
+			consola.error("Error updating ringtone:", error);
+			if (error instanceof ORPCError) {
+				throw error;
+			}
+			throw new ORPCError("INTERNAL_SERVER_ERROR", {
+				message: "Failed to update ringtone",
+			});
+		}
+	});
+
+const deleteRingtone = protectedProcedure
+	.input(
+		z.object({
+			id: z.string(),
+		}),
+	)
+	.handler(async ({ input, context }) => {
+		const { id } = input;
+		const userId = context.session.user.id;
+
+		try {
+			consola.info("Deleting ringtone:", { id, userId });
+
+			const existingRingtone = await db
+				.select()
+				.from(ringtone)
+				.where(eq(ringtone.id, id))
+				.limit(1);
+
+			if (existingRingtone.length === 0) {
+				throw new ORPCError("NOT_FOUND", {
+					message: "Ringtone not found",
+				});
+			}
+
+			if (existingRingtone[0].userId !== userId) {
+				throw new ORPCError("FORBIDDEN", {
+					message: "You can only delete your own ringtones",
+				});
+			}
+
+			const ringtoneData = existingRingtone[0];
+
+			await db.delete(ringtone).where(eq(ringtone.id, id));
+
+			try {
+				const filePath = path.join(
+					process.cwd(),
+					"public",
+					ringtoneData.downloadUrl,
+				);
+				await fs.unlink(filePath);
+				consola.info("File deleted:", filePath);
+			} catch (fileError) {
+				consola.warn("Could not delete file (file may not exist):", fileError);
+			}
+
+			consola.success("Ringtone deleted successfully:", { id });
+
+			return { success: true };
+		} catch (error) {
+			consola.error("Error deleting ringtone:", error);
+			if (error instanceof ORPCError) {
+				throw error;
+			}
+			throw new ORPCError("INTERNAL_SERVER_ERROR", {
+				message: "Failed to delete ringtone",
+			});
+		}
+	});
+
 export const ringtoneRouter = {
 	create: createRingtone,
 	getAll: getRingtones,
 	getVideoInfo: getVideoInfo,
+	update: updateRingtone,
+	delete: deleteRingtone,
 };

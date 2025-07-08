@@ -8,6 +8,7 @@ import {
 	Music,
 	Play,
 	Plus,
+	UserPlus,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -29,6 +30,19 @@ function RouteComponent() {
 	const { data: session, isPending: isSessionPending } =
 		authClient.useSession();
 
+	useEffect(() => {
+		if (!isSessionPending && !session) {
+			authClient.signIn
+				.anonymous()
+				.then(() => {
+					console.log("Anonymous user signed in");
+				})
+				.catch((error) => {
+					console.error("Failed to sign in anonymous user:", error);
+				});
+		}
+	}, [session, isSessionPending]);
+
 	const [videoUrl, setVideoUrl] = useState("");
 	const [videoInfo, setVideoInfo] = useState<{
 		title: string;
@@ -37,31 +51,26 @@ function RouteComponent() {
 		uploader: string;
 	} | null>(null);
 
-	// Helper to create a safe default file name from the video title
 	const createSafeFileName = (title: string) =>
 		title
-			// Remove invalid filename characters
 			.replace(/[<>:"/\\|?*]/g, "")
-			// Collapse whitespace
 			.replace(/\s+/g, " ")
-			// Trim and limit length
 			.trim()
 			.slice(0, 50) || "ringtone";
 
 	useEffect(() => {
-		if (!isSessionPending && !session) {
-			navigate({ to: "/login" });
-		}
-	}, [isSessionPending, session, navigate]);
-
-	useEffect(() => {
 		if (videoInfo) {
-			const maxStart = Math.max(0, Math.min(videoInfo.duration - 10, videoInfo.duration * 0.1));
-			form.setFieldValue('startSeconds', Math.floor(maxStart));
-			form.setFieldValue('endSeconds', Math.floor(maxStart) + 10);
-			// Pre-fill the file name with a sanitized video title if the user hasn't typed anything yet
-			if (form.state.values.fileName === 'ringtone' || !form.state.values.fileName) {
-				form.setFieldValue('fileName', createSafeFileName(videoInfo.title));
+			const maxStart = Math.max(
+				0,
+				Math.min(videoInfo.duration - 10, videoInfo.duration * 0.1),
+			);
+			form.setFieldValue("startSeconds", Math.floor(maxStart));
+			form.setFieldValue("endSeconds", Math.floor(maxStart) + 10);
+			if (
+				form.state.values.fileName === "ringtone" ||
+				!form.state.values.fileName
+			) {
+				form.setFieldValue("fileName", createSafeFileName(videoInfo.title));
 			}
 		}
 	}, [videoInfo]);
@@ -88,7 +97,13 @@ function RouteComponent() {
 	const createMutation = useMutation(
 		orpc.ringtone.create.mutationOptions({
 			onSuccess: () => {
-				toast.success("Ringtone created successfully!");
+				if (session?.user.isAnonymous) {
+					toast.success(
+						"Ringtone created! Check your dashboard to download it.",
+					);
+				} else {
+					toast.success("Ringtone created and saved to your account!");
+				}
 				queryClient.invalidateQueries({
 					queryKey: orpc.ringtone.getAll.queryKey(),
 				});
@@ -201,7 +216,7 @@ function RouteComponent() {
 		}
 	};
 
-	if (isSessionPending || !session) {
+	if (isSessionPending) {
 		return <Loader />;
 	}
 
@@ -216,9 +231,43 @@ function RouteComponent() {
 						Create Ringtones
 					</h1>
 					<p className="text-muted-foreground">
-						Welcome back, {session.user.name}
+						{session && !session.user.isAnonymous
+							? `Welcome back, ${session.user.name}`
+							: "Create ringtones from any video - free and easy!"}
 					</p>
 				</div>
+
+				{session?.user.isAnonymous && (
+					<div className="mb-8 rounded-xl border border-blue-200 bg-blue-50 p-6 dark:border-blue-800 dark:bg-blue-900/20">
+						<div className="flex items-start space-x-3">
+							<div className="flex-shrink-0">
+								<Music className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+							</div>
+							<div className="flex-1">
+								<h3 className="font-medium text-blue-900 dark:text-blue-100">
+									Free Ringtone Creation
+								</h3>
+								<p className="mt-1 text-blue-800 text-sm dark:text-blue-200">
+									You're using anonymous mode. Your ringtones are saved
+									temporarily and can be downloaded from your dashboard.
+								</p>
+								<div className="mt-4 flex items-center space-x-3">
+									<Button
+										size="sm"
+										onClick={() => navigate({ to: "/login" })}
+										className="bg-blue-600 text-white hover:bg-blue-700"
+									>
+										<UserPlus className="mr-2 h-4 w-4" />
+										Sign Up to Save Permanently
+									</Button>
+									<span className="text-blue-700 text-sm dark:text-blue-300">
+										Create an account to keep your ringtones forever
+									</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				)}
 
 				<div className="mb-12 rounded-xl border border-border bg-card p-8 shadow-sm">
 					<form
@@ -293,16 +342,15 @@ function RouteComponent() {
 							<div className="flex items-center space-x-2 rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20">
 								<AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
 								<p className="text-sm text-yellow-800 dark:text-yellow-200">
-									This video is quite short (
-									{secondsToHms(videoInfo.duration)}). Make sure your ringtone
-									times fit within this duration.
+									This video is quite short ({secondsToHms(videoInfo.duration)}
+									). Make sure your ringtone times fit within this duration.
 								</p>
 							</div>
 						)}
 
 						{videoInfo && (
 							<div className="space-y-6">
-								<div className="flex justify-around items-center gap-4">
+								<div className="flex items-center justify-around gap-4">
 									<TimePicker
 										label="Start Time"
 										value={secondsToHms(form.state.values.startSeconds)}
@@ -325,7 +373,10 @@ function RouteComponent() {
 							<form.Field name="fileName">
 								{(field) => (
 									<div className="space-y-3">
-										<Label htmlFor={field.name} className="font-medium text-base">
+										<Label
+											htmlFor={field.name}
+											className="font-medium text-base"
+										>
 											File Name
 										</Label>
 										<Input
@@ -361,7 +412,11 @@ function RouteComponent() {
 									) : (
 										<Plus className="mr-2 h-5 w-5" />
 									)}
-									{createMutation.isPending ? "Creating..." : "Create Ringtone"}
+									{createMutation.isPending
+										? "Creating..."
+										: session
+											? "Create & Save Ringtone"
+											: "Create Ringtone"}
 								</Button>
 							)}
 						</form.Subscribe>
@@ -374,59 +429,87 @@ function RouteComponent() {
 					</form>
 				</div>
 
-				<div className="space-y-6">
-					<h2 className="font-light text-foreground text-xl">Your Ringtones</h2>
+				{session && (
+					<div className="space-y-6">
+						<div className="flex items-center justify-between">
+							<h2 className="font-light text-foreground text-xl">
+								Your Saved Ringtones
+							</h2>
+							<Button
+								variant="outline"
+								onClick={() => navigate({ to: "/dashboard" })}
+								className="flex items-center space-x-2"
+							>
+								<Music className="h-4 w-4" />
+								<span>View Dashboard</span>
+							</Button>
+						</div>
 
-					{ringtonesQuery.isLoading ? (
-						<div className="flex justify-center py-12">
-							<Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-						</div>
-					) : ringtonesQuery.data?.length === 0 ? (
-						<div className="py-12 text-center">
-							<Music className="mx-auto mb-4 h-12 w-12 text-muted-foreground opacity-50" />
-							<p className="text-muted-foreground">
-								No ringtones yet. Create your first one above!
-							</p>
-						</div>
-					) : (
-						<div className="space-y-3">
-							{ringtonesQuery.data?.map((ringtone) => (
-								<div
-									key={ringtone.id}
-									className="flex items-center justify-between rounded-lg border border-border bg-card p-4 transition-colors hover:bg-muted/20"
-								>
-									<div className="flex items-center space-x-3">
-										<Music className="h-5 w-5 text-muted-foreground" />
-										<div>
-											<p className="font-medium text-foreground">
-												{ringtone.fileName}.mp3
-											</p>
-											<p className="text-muted-foreground text-sm">
-												{secondsToHms(Number.parseInt(ringtone.startTime, 10))} → {secondsToHms(Number.parseInt(ringtone.endTime, 10))}
-											</p>
-										</div>
-									</div>
-									<Button
-										variant="outline"
-										size="sm"
-										asChild
-										className="shrink-0"
+						{ringtonesQuery.isLoading ? (
+							<div className="flex justify-center py-12">
+								<Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+							</div>
+						) : ringtonesQuery.data?.length === 0 ? (
+							<div className="py-12 text-center">
+								<Music className="mx-auto mb-4 h-12 w-12 text-muted-foreground opacity-50" />
+								<p className="text-muted-foreground">
+									No saved ringtones yet. Create your first one above!
+								</p>
+							</div>
+						) : (
+							<div className="space-y-3">
+								{ringtonesQuery.data?.slice(0, 3).map((ringtone) => (
+									<div
+										key={ringtone.id}
+										className="flex items-center justify-between rounded-lg border border-border bg-card p-4 transition-colors hover:bg-muted/20"
 									>
-										<a
-											href={`${import.meta.env.VITE_SERVER_URL}${ringtone.downloadUrl}`}
-											download
-											target="_blank"
-											className="flex items-center"
+										<div className="flex items-center space-x-3">
+											<Music className="h-5 w-5 text-muted-foreground" />
+											<div>
+												<p className="font-medium text-foreground">
+													{ringtone.fileName}.mp3
+												</p>
+												<p className="text-muted-foreground text-sm">
+													{secondsToHms(
+														Number.parseInt(ringtone.startTime, 10),
+													)}{" "}
+													→{" "}
+													{secondsToHms(Number.parseInt(ringtone.endTime, 10))}
+												</p>
+											</div>
+										</div>
+										<Button
+											variant="outline"
+											size="sm"
+											asChild
+											className="shrink-0"
 										>
-											<Download className="mr-2 h-4 w-4" />
-											Download
-										</a>
-									</Button>
-								</div>
-							))}
-						</div>
-					)}
-				</div>
+											<a
+												href={`${import.meta.env.VITE_SERVER_URL}${ringtone.downloadUrl}`}
+												download
+												target="_blank"
+												className="flex items-center"
+											>
+												<Download className="mr-2 h-4 w-4" />
+												Download
+											</a>
+										</Button>
+									</div>
+								))}
+								{ringtonesQuery.data && ringtonesQuery.data.length > 3 && (
+									<div className="pt-4 text-center">
+										<Button
+											variant="outline"
+											onClick={() => navigate({ to: "/dashboard" })}
+										>
+											View All ({ringtonesQuery.data.length}) Ringtones
+										</Button>
+									</div>
+								)}
+							</div>
+						)}
+					</div>
+				)}
 			</div>
 		</div>
 	);
