@@ -33,12 +33,15 @@ function RouteComponent() {
 	useEffect(() => {
 		if (!isSessionPending && !session) {
 			authClient.signIn
-				.anonymous()
-				.then(() => {
-					console.log("Anonymous user signed in");
-				})
-				.catch((error) => {
-					console.error("Failed to sign in anonymous user:", error);
+				.anonymous({
+					fetchOptions: {
+						onSuccess: () => {
+							toast.success("Anonymous user signed in");
+						},
+						onError: () => {
+							toast.error("Failed to sign in anonymous user");
+						},
+					},
 				});
 		}
 	}, [session, isSessionPending]);
@@ -162,36 +165,6 @@ function RouteComponent() {
 							message: "File name contains invalid characters",
 						}),
 				})
-				.refine(
-					(data) => {
-						return data.endSeconds > data.startSeconds;
-					},
-					{
-						message: "End time must be after start time",
-						path: ["endSeconds"],
-					},
-				)
-				.refine(
-					(data) => {
-						return data.endSeconds - data.startSeconds <= 60;
-					},
-					{
-						message: "Ringtone duration should be 60 seconds or less",
-						path: ["endSeconds"],
-					},
-				)
-				.refine(
-					(data) => {
-						if (!videoInfo?.duration) return true;
-						return data.endSeconds <= videoInfo.duration;
-					},
-					{
-						message: videoInfo?.duration
-							? `End time cannot exceed video duration (${secondsToHms(videoInfo.duration)})`
-							: "End time exceeds video duration",
-						path: ["endSeconds"],
-					},
-				),
 		},
 	});
 
