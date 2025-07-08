@@ -31,7 +31,7 @@ export default function UserMenu() {
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
-				<Button variant="outline" className="h-10 flex items-center space-x-2">
+				<Button variant="outline" className="flex h-10 items-center space-x-2">
 					<User className="h-4 w-4" />
 					<span>{session.user.name}</span>
 				</Button>
@@ -39,15 +39,17 @@ export default function UserMenu() {
 			<DropdownMenuContent className="w-56" align="end">
 				<DropdownMenuLabel className="font-normal">
 					<div className="flex flex-col space-y-1">
-						<p className="text-sm font-medium leading-none">{session.user.name}</p>
-						<p className="text-xs leading-none text-muted-foreground">
+						<p className="font-medium text-sm leading-none">
+							{session.user.name}
+						</p>
+						<p className="text-muted-foreground text-xs leading-none">
 							{session.user.email}
 						</p>
 					</div>
 				</DropdownMenuLabel>
 				<DropdownMenuSeparator />
 				<DropdownMenuItem
-					className="text-red-600 focus:text-red-600 cursor-pointer"
+					className="cursor-pointer text-red-600 focus:text-red-600"
 					onClick={() => {
 						authClient.signOut({
 							fetchOptions: {

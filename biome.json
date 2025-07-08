@@ -19,7 +19,10 @@
 			"!**/src-tauri",
 			"!**/.nuxt",
 			"!bts.jsonc",
-			"!**/downloads"
+			"!**/downloads",
+			"!**/node_modules",
+			"!**/.tanstack",
+			"!**/.nitro"
 		]
 	},
 	"formatter": {
