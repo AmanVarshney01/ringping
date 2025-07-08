@@ -51,4 +51,4 @@ lerna-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-downloads/
+/public/

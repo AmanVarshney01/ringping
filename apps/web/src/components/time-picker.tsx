@@ -56,7 +56,7 @@ export const TimePicker = ({
 		max: number,
 	) => {
 		const num = Number.parseInt(newValue, 10);
-		if (!isNaN(num) && num >= 0 && num <= max) {
+		if (!Number.isNaN(num) && num >= 0 && num <= max) {
 			setter(num);
 		} else if (newValue === "") {
 			setter(0);

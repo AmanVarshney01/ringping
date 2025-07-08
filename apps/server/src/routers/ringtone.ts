@@ -1,16 +1,14 @@
+import crypto from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { ORPCError } from "@orpc/server";
-import { exec } from "child_process";
-import crypto from "crypto";
+import { consola } from "consola";
 import { eq } from "drizzle-orm";
-import fs from "fs/promises";
-import path from "path";
-import { promisify } from "util";
+import { execa } from "execa";
 import z from "zod/v4";
 import { db } from "../db";
 import { ringtone } from "../db/schema/ringtone";
 import { protectedProcedure } from "../lib/orpc";
-
-const execAsync = promisify(exec);
 
 const timeToSeconds = (timeString: string): number => {
 	const [hours, minutes, seconds] = timeString.split(":").map(Number);
@@ -27,14 +25,19 @@ const getVideoInfo = protectedProcedure
 		const { url } = input;
 
 		try {
-			const { stdout } = await execAsync(
+			consola.info("Fetching video info for URL:", url);
+
+			const { stdout } = await execa(
 				`yt-dlp --print "%(title)s" --print "%(duration)s" --print "%(uploader)s" --print "%(thumbnail)s" --no-download "${url}"`,
+				{ shell: true },
 			);
 
 			const lines = stdout.trim().split("\n");
 			const [title, durationStr, uploader, thumbnail] = lines;
 
 			const duration = Number.parseInt(durationStr, 10) || 0;
+
+			consola.success("Video info fetched successfully:", { title, duration });
 
 			return {
 				title: title || "Unknown",
@@ -43,7 +46,7 @@ const getVideoInfo = protectedProcedure
 				uploader: uploader || "Unknown",
 			};
 		} catch (error) {
-			console.error("Error getting video info:", error);
+			consola.error("Error getting video info:", error);
 			throw new ORPCError("BAD_REQUEST", {
 				message: "Could not fetch video information. Please check the URL.",
 			});
@@ -98,6 +101,13 @@ const createRingtone = protectedProcedure
 		const downloadUrl = `/downloads/${userId}/${fileName}.mp3`;
 
 		try {
+			consola.info("Creating ringtone:", {
+				fileName,
+				startTime,
+				endTime,
+				userId,
+			});
+
 			const bufferSeconds = 5;
 			const sectionStartSeconds = Math.max(0, startSeconds - bufferSeconds);
 			const sectionEndSeconds = endSeconds + bufferSeconds;
@@ -112,34 +122,18 @@ const createRingtone = protectedProcedure
 			const sectionStart = formatTime(sectionStartSeconds);
 			const sectionEnd = formatTime(sectionEndSeconds);
 
-			await execAsync(
-				[
-					"yt-dlp",
-					`--download-sections "*${sectionStart}-${sectionEnd}"`,
-					"-x",
-					"--audio-format mp3",
-					"-f best",
-					`-o "${tempRingtonePath}"`,
-					`"${url}"`,
-				].join(" "),
+			consola.info("Downloading audio section:", { sectionStart, sectionEnd });
+
+			await execa(
+				`yt-dlp --download-sections "*${sectionStart}-${sectionEnd}" -x --audio-format mp3 -f best -o "${tempRingtonePath}" "${url}"`,
+				{ shell: true },
 			);
 
-			await execAsync(
-				[
-					"ffmpeg",
-					"-i",
-					`"${tempRingtonePath}"`,
-					"-ss",
-					startTime,
-					"-to",
-					endTime,
-					"-c",
-					"copy",
-					"-avoid_negative_ts",
-					"make_zero",
-					`"${finalRingtonePath}"`,
-					"-y",
-				].join(" "),
+			consola.info("Trimming audio to final ringtone");
+
+			await execa(
+				`ffmpeg -i "${tempRingtonePath}" -ss ${startTime} -to ${endTime} -c copy -avoid_negative_ts make_zero "${finalRingtonePath}" -y`,
+				{ shell: true },
 			);
 
 			await fs.unlink(tempRingtonePath);
@@ -154,11 +148,16 @@ const createRingtone = protectedProcedure
 				userId,
 			});
 
+			consola.success("Ringtone created successfully:", {
+				fileName,
+				downloadUrl,
+			});
+
 			return {
 				downloadUrl: downloadUrl,
 			};
 		} catch (error) {
-			console.error("Error creating ringtone:", error);
+			consola.error("Error creating ringtone:", error);
 
 			try {
 				if (await fs.stat(tempRingtonePath)) {
@@ -168,7 +167,7 @@ const createRingtone = protectedProcedure
 					await fs.unlink(finalRingtonePath);
 				}
 			} catch (cleanupError) {
-				console.error("Cleanup error:", cleanupError);
+				consola.error("Cleanup error:", cleanupError);
 			}
 
 			throw new ORPCError("INTERNAL_SERVER_ERROR", {
@@ -179,7 +178,16 @@ const createRingtone = protectedProcedure
 
 const getRingtones = protectedProcedure.handler(async ({ context }) => {
 	const userId = context.session.user.id;
-	return db.select().from(ringtone).where(eq(ringtone.userId, userId));
+	consola.info("Fetching ringtones for user:", userId);
+
+	const userRingtones = await db
+		.select()
+		.from(ringtone)
+		.where(eq(ringtone.userId, userId));
+
+	consola.info("Found ringtones:", userRingtones.length);
+
+	return userRingtones;
 });
 
 export const ringtoneRouter = {
