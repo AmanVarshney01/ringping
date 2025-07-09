@@ -114,8 +114,8 @@ const createRingtone = protectedProcedure
 				id: ringtoneId,
 				fileName,
 				originalUrl: url,
-				startTime: startSeconds.toString(),
-				endTime: endSeconds.toString(),
+				startTime: startSeconds,
+				endTime: endSeconds,
 				downloadUrl,
 				userId,
 			});

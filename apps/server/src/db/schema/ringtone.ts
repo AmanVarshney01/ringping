@@ -6,8 +6,8 @@ export const ringtone = sqliteTable("ringtone", {
 	id: text("id").primaryKey(),
 	fileName: text("file_name").notNull(),
 	originalUrl: text("original_url").notNull(),
-	startTime: text("start_time").notNull(),
-	endTime: text("end_time").notNull(),
+	startTime: integer("start_time").notNull(),
+	endTime: integer("end_time").notNull(),
 	downloadUrl: text("download_url").notNull(),
 	userId: text("user_id")
 		.notNull()

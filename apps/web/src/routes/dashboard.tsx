@@ -33,6 +33,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { authClient } from "@/lib/auth-client";
+import { secondsToHms } from "@/lib/utils";
 import { orpc, queryClient } from "@/utils/orpc";
 
 export const Route = createFileRoute("/dashboard")({
@@ -100,14 +101,6 @@ function DashboardComponent() {
 		navigate({ to: "/login" });
 		return null;
 	}
-
-	const secondsToHms = (d: number) => {
-		const dur = Number(d);
-		const h = Math.floor(dur / 3600);
-		const m = Math.floor((dur % 3600) / 60);
-		const s = Math.floor((dur % 3600) % 60);
-		return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-	};
 
 	const handleEdit = (ringtone: { id: string; fileName: string }) => {
 		setEditingRingtone(ringtone);
@@ -216,8 +209,8 @@ function DashboardComponent() {
 										</div>
 									</TableCell>
 									<TableCell>
-										{secondsToHms(Number.parseInt(ringtone.startTime, 10))} →{" "}
-										{secondsToHms(Number.parseInt(ringtone.endTime, 10))}
+										{secondsToHms(ringtone.startTime)} →{" "}
+										{secondsToHms(ringtone.endTime)}
 									</TableCell>
 									<TableCell>
 										<a
