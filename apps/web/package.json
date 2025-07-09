@@ -10,6 +10,7 @@
 		"cf-typegen": "wrangler types --env-interface Env"
 	},
 	"dependencies": {
+		"@base-ui-components/react": "^1.0.0-beta.1",
 		"@orpc/client": "^1.5.0",
 		"@orpc/server": "^1.5.0",
 		"@orpc/tanstack-query": "^1.5.0",
@@ -41,6 +42,7 @@
 		"tailwindcss": "^4.1.3",
 		"tw-animate-css": "^1.2.5",
 		"vite-tsconfig-paths": "^5.1.4",
+		"wavesurfer.js": "^7.9.9",
 		"zod": "^3.25.16"
 	},
 	"devDependencies": {

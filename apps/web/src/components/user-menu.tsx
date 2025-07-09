@@ -42,14 +42,14 @@ export default function UserMenu() {
 						<p className="font-medium text-sm leading-none">
 							{session.user.name}
 						</p>
-						<p className="text-muted-foreground text-xs leading-none">
+						<p className="truncate text-muted-foreground text-xs leading-none">
 							{session.user.email}
 						</p>
 					</div>
 				</DropdownMenuLabel>
 				<DropdownMenuSeparator />
 				<DropdownMenuItem
-					className="cursor-pointer text-red-600 focus:text-red-600"
+					className="cursor-pointer"
 					onClick={() => {
 						authClient.signOut({
 							fetchOptions: {

@@ -1,169 +1,130 @@
+import * as Slider from "@radix-ui/react-slider";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Label } from "./ui/label";
 
-type TimePickerProps = {
-	value: string; // in HH:MM:SS format
-	onChange: (value: string) => void;
-	label?: string;
+type TimeRangeSliderProps = {
+	startTime: number; // in seconds
+	endTime: number; // in seconds
+	maxDuration: number; // in seconds
+	onChange: (start: number, end: number) => void;
 	className?: string;
 	id?: string;
+	minDuration?: number; // minimum allowed duration in seconds
+	maxAllowedDuration?: number; // maximum allowed duration in seconds
 };
 
-export const TimePicker = ({
-	value = "00:00:00",
+export const TimeRangeSlider = ({
+	startTime,
+	endTime,
+	maxDuration,
 	onChange,
-	label,
 	className,
 	id,
-}: TimePickerProps) => {
-	const [hours, setHours] = React.useState(() => {
-		const match = value.match(/^(\d{2}):(\d{2}):(\d{2})$/);
-		return match ? Number.parseInt(match[1], 10) : 0;
-	});
+	minDuration = 5,
+	maxAllowedDuration = 60,
+}: TimeRangeSliderProps) => {
+	// Internal state to handle dragging
+	const [localValues, setLocalValues] = React.useState<[number, number]>([
+		startTime,
+		endTime,
+	]);
 
-	const [minutes, setMinutes] = React.useState(() => {
-		const match = value.match(/^(\d{2}):(\d{2}):(\d{2})$/);
-		return match ? Number.parseInt(match[2], 10) : 0;
-	});
-
-	const [seconds, setSeconds] = React.useState(() => {
-		const match = value.match(/^(\d{2}):(\d{2}):(\d{2})$/);
-		return match ? Number.parseInt(match[3], 10) : 0;
-	});
-
+	// Update local values when props change
 	React.useEffect(() => {
-		const match = value.match(/^(\d{2}):(\d{2}):(\d{2})$/);
-		if (match) {
-			setHours(Number.parseInt(match[1], 10));
-			setMinutes(Number.parseInt(match[2], 10));
-			setSeconds(Number.parseInt(match[3], 10));
-		}
-	}, [value]);
+		setLocalValues([startTime, endTime]);
+	}, [startTime, endTime]);
 
-	React.useEffect(() => {
-		const formattedValue = [
-			hours.toString().padStart(2, "0"),
-			minutes.toString().padStart(2, "0"),
-			seconds.toString().padStart(2, "0"),
-		].join(":");
-		onChange(formattedValue);
-	}, [hours, minutes, seconds, onChange]);
-
-	const handleInputChange = (
-		newValue: string,
-		setter: (value: number) => void,
-		max: number,
-	) => {
-		const num = Number.parseInt(newValue, 10);
-		if (!Number.isNaN(num) && num >= 0 && num <= max) {
-			setter(num);
-		} else if (newValue === "") {
-			setter(0);
-		}
+	const formatTime = (seconds: number) => {
+		const h = Math.floor(seconds / 3600);
+		const m = Math.floor((seconds % 3600) / 60);
+		const s = Math.floor(seconds % 60);
+		return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 	};
 
-	const handleKeyDown = (
-		e: React.KeyboardEvent<HTMLInputElement>,
-		type: "hours" | "minutes" | "seconds",
-		current: number,
-		setter: (value: number) => void,
-		max: number,
-	) => {
-		if (e.key === "ArrowUp") {
-			e.preventDefault();
-			setter(current >= max ? (type === "hours" ? max : 0) : current + 1);
-		} else if (e.key === "ArrowDown") {
-			e.preventDefault();
-			setter(current <= 0 ? (type === "hours" ? 0 : max) : current - 1);
+	const duration = localValues[1] - localValues[0];
+
+	const handleValueChange = (newValues: number[]) => {
+		if (!newValues || newValues.length !== 2) return;
+
+		let [newStart, newEnd] = newValues;
+
+		// Enforce minimum duration constraint
+		if (newEnd - newStart < minDuration) {
+			// If moving end thumb
+			if (newEnd !== localValues[1]) {
+				newEnd = Math.min(newStart + minDuration, maxDuration);
+			}
+			// If moving start thumb
+			else if (newStart !== localValues[0]) {
+				newStart = Math.max(0, newEnd - minDuration);
+			}
 		}
+
+		// Enforce maximum duration constraint
+		if (newEnd - newStart > maxAllowedDuration) {
+			// If moving end thumb
+			if (newEnd !== localValues[1]) {
+				newEnd = Math.min(newStart + maxAllowedDuration, maxDuration);
+			}
+			// If moving start thumb
+			else if (newStart !== localValues[0]) {
+				newStart = Math.max(0, newEnd - maxAllowedDuration);
+			}
+		}
+
+		// Update local state immediately for responsive UI
+		setLocalValues([newStart, newEnd]);
+
+		// Notify parent component
+		onChange(newStart, newEnd);
 	};
+
+	console.log("TimeRangeSlider render:", {
+		localValues,
+		startTime,
+		endTime,
+		maxDuration,
+	});
 
 	return (
-		<div className={cn("space-y-3", className)}>
-			{label && (
-				<Label htmlFor={id} className="font-medium text-sm">
-					{label}
-				</Label>
-			)}
-
-			<div className="flex items-center justify-center space-x-2">
-				<div className="flex flex-col items-center space-y-1">
-					<span className="font-medium text-muted-foreground text-xs">
-						Hours
-					</span>
-					<input
-						type="number"
-						min="0"
-						max="23"
-						value={hours.toString().padStart(2, "0")}
-						onChange={(e) => handleInputChange(e.target.value, setHours, 23)}
-						onKeyDown={(e) => handleKeyDown(e, "hours", hours, setHours, 23)}
-						className={cn(
-							"h-12 w-16 text-center font-mono font-semibold text-lg",
-							"rounded-lg border border-border bg-background",
-							"focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring",
-							"transition-colors hover:border-muted-foreground",
-							"appearance-none",
-						)}
-						id={`${id}-hours`}
-						aria-label="Hours"
-					/>
+		<div className={cn("space-y-6 p-4", className)}>
+			<div className="space-y-2">
+				<Label className="font-medium text-sm">Select Time Range</Label>
+				<div className="flex items-center justify-between text-muted-foreground text-xs">
+					<span>Start: {formatTime(localValues[0])}</span>
+					<span>Duration: {duration}s</span>
+					<span>End: {formatTime(localValues[1])}</span>
 				</div>
+			</div>
 
-				<span className="mt-6 font-mono text-2xl text-muted-foreground">:</span>
-
-				<div className="flex flex-col items-center space-y-1">
-					<span className="font-medium text-muted-foreground text-xs">
-						Minutes
-					</span>
-					<input
-						type="number"
-						min="0"
-						max="59"
-						value={minutes.toString().padStart(2, "0")}
-						onChange={(e) => handleInputChange(e.target.value, setMinutes, 59)}
-						onKeyDown={(e) =>
-							handleKeyDown(e, "minutes", minutes, setMinutes, 59)
-						}
-						className={cn(
-							"h-12 w-16 text-center font-mono font-semibold text-lg",
-							"rounded-lg border border-border bg-background",
-							"focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring",
-							"transition-colors hover:border-muted-foreground",
-							"appearance-none",
-						)}
-						id={`${id}-minutes`}
-						aria-label="Minutes"
+			<div className="py-4">
+				<Slider.Root
+					value={localValues}
+					onValueChange={handleValueChange}
+					min={0}
+					max={maxDuration}
+					step={1}
+					className="relative flex w-full touch-none select-none items-center py-4"
+					id={id}
+				>
+					<Slider.Track className="relative h-3 w-full grow overflow-hidden rounded-full bg-secondary">
+						<Slider.Range className="absolute h-full bg-primary" />
+					</Slider.Track>
+					<Slider.Thumb
+						className="block h-6 w-6 cursor-grab rounded-full border-2 border-primary bg-background ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:cursor-grabbing disabled:pointer-events-none disabled:opacity-50"
+						aria-label="Start time"
 					/>
-				</div>
-
-				<span className="mt-6 font-mono text-2xl text-muted-foreground">:</span>
-
-				<div className="flex flex-col items-center space-y-1">
-					<span className="font-medium text-muted-foreground text-xs">
-						Seconds
-					</span>
-					<input
-						type="number"
-						min="0"
-						max="59"
-						value={seconds.toString().padStart(2, "0")}
-						onChange={(e) => handleInputChange(e.target.value, setSeconds, 59)}
-						onKeyDown={(e) =>
-							handleKeyDown(e, "seconds", seconds, setSeconds, 59)
-						}
-						className={cn(
-							"h-12 w-16 text-center font-mono font-semibold text-lg",
-							"rounded-lg border border-border bg-background",
-							"focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring",
-							"transition-colors hover:border-muted-foreground",
-							"appearance-none",
-						)}
-						id={`${id}-seconds`}
-						aria-label="Seconds"
+					<Slider.Thumb
+						className="block h-6 w-6 cursor-grab rounded-full border-2 border-primary bg-background ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:cursor-grabbing disabled:pointer-events-none disabled:opacity-50"
+						aria-label="End time"
 					/>
-				</div>
+				</Slider.Root>
+			</div>
+
+			<div className="flex items-center justify-between text-muted-foreground text-xs">
+				<span>0:00:00</span>
+				<span>{formatTime(maxDuration)}</span>
 			</div>
 		</div>
 	);
