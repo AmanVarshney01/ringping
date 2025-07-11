@@ -8,7 +8,7 @@ import { execa } from "execa";
 import z from "zod/v4";
 import { db } from "../db";
 import { ringtone } from "../db/schema/ringtone";
-import { protectedProcedure, publicProcedure } from "../lib/orpc";
+import { protectedProcedure } from "../lib/orpc";
 
 const getVideoInfo = protectedProcedure
 	.input(
@@ -93,8 +93,19 @@ const createRingtone = protectedProcedure
 			});
 
 			consola.info("Downloading time range:", { startSeconds, endSeconds });
+
+			const formatTime = (seconds: number) => {
+				const h = Math.floor(seconds / 3600);
+				const m = Math.floor((seconds % 3600) / 60);
+				const s = Math.floor(seconds % 60);
+				return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+			};
+
+			const startTimeFormatted = formatTime(startSeconds);
+			const endTimeFormatted = formatTime(endSeconds);
+
 			await execa(
-				`yt-dlp -x --audio-format mp3 --audio-quality 192K --download-sections "*${startSeconds}-${endSeconds}" -o "${outputPath}" "${url}"`,
+				`yt-dlp -x --audio-format mp3 --audio-quality 192K --download-sections "*${startTimeFormatted}-${endTimeFormatted}" -o "${outputPath}" "${url}"`,
 				{
 					shell: true,
 					timeout: 120000,
