@@ -94,9 +94,9 @@ function RouteComponent() {
 				queryClient.invalidateQueries({
 					queryKey: orpc.ringtone.getAll.queryKey(),
 				});
-				form.reset();
-				setVideoInfo(null);
-				setVideoUrl("");
+				// form.reset();
+				// setVideoInfo(null);
+				// setVideoUrl("");
 			},
 			onError: (error) => {
 				toast.error(error.message);
