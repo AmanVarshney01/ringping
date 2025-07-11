@@ -1,5 +1,6 @@
 import { Download } from "lucide-react";
 import * as React from "react";
+import { CustomAudioPlayer } from "./custom-audio-player";
 import { Button } from "./ui/button";
 import {
 	Dialog,
@@ -23,8 +24,6 @@ export const RingtonePlayerDialog = ({
 	fileName,
 }: RingtonePlayerDialogProps) => {
 	const [error, setError] = React.useState<string | null>(null);
-	const audioRef = React.useRef<HTMLAudioElement>(null);
-	const [isLoading, setIsLoading] = React.useState(true);
 
 	const handleDownload = () => {
 		console.log("📥 Download clicked for:", audioUrl);
@@ -38,7 +37,6 @@ export const RingtonePlayerDialog = ({
 
 	React.useEffect(() => {
 		if (isOpen) {
-			setIsLoading(true);
 			setError(null);
 		}
 	}, [isOpen, audioUrl]);
@@ -61,32 +59,13 @@ export const RingtonePlayerDialog = ({
 					</div>
 
 					<div className="flex flex-col gap-4">
-						<audio
-							ref={audioRef}
-							controls
-							className="w-full"
-							preload="metadata"
+						<CustomAudioPlayer
 							src={audioUrl}
-							onLoadStart={() => setIsLoading(true)}
-							onLoadedMetadata={() => {
-								setIsLoading(false);
-							}}
 							onError={() => {
 								setError("Failed to load audio file");
-								setIsLoading(false);
 							}}
 							autoPlay
-						>
-							<source src={audioUrl} type="audio/mpeg" />
-							<track kind="captions" src="" label="No captions available" />
-							Your browser does not support the audio element.
-						</audio>
-
-						{isLoading && (
-							<div className="text-center text-muted-foreground text-sm">
-								Loading audio...
-							</div>
-						)}
+						/>
 
 						{error && (
 							<div className="text-center text-red-500 text-sm">{error}</div>
