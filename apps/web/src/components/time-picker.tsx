@@ -4,14 +4,14 @@ import { cn } from "@/lib/utils";
 import { Label } from "./ui/label";
 
 type TimeRangeSliderProps = {
-	startTime: number; // in seconds
-	endTime: number; // in seconds
-	maxDuration: number; // in seconds
+	startTime: number;
+	endTime: number;
+	maxDuration: number;
 	onChange: (start: number, end: number) => void;
 	className?: string;
 	id?: string;
-	minDuration?: number; // minimum allowed duration in seconds
-	maxAllowedDuration?: number; // maximum allowed duration in seconds
+	minDuration?: number;
+	maxAllowedDuration?: number;
 };
 
 export const TimeRangeSlider = ({
@@ -24,13 +24,12 @@ export const TimeRangeSlider = ({
 	minDuration = 5,
 	maxAllowedDuration = 60,
 }: TimeRangeSliderProps) => {
-	// Internal state to handle dragging
 	const [localValues, setLocalValues] = React.useState<[number, number]>([
 		startTime,
 		endTime,
 	]);
+	const trackRef = React.useRef<HTMLSpanElement>(null);
 
-	// Update local values when props change
 	React.useEffect(() => {
 		setLocalValues([startTime, endTime]);
 	}, [startTime, endTime]);
@@ -47,45 +46,53 @@ export const TimeRangeSlider = ({
 	const handleValueChange = (newValues: number[]) => {
 		if (!newValues || newValues.length !== 2) return;
 
-		let [newStart, newEnd] = newValues;
+		const [newStart, newEnd] = newValues;
 
-		// Enforce minimum duration constraint
-		if (newEnd - newStart < minDuration) {
-			// If moving end thumb
-			if (newEnd !== localValues[1]) {
-				newEnd = Math.min(newStart + minDuration, maxDuration);
+		setLocalValues([newStart, newEnd]);
+
+		onChange(newStart, newEnd);
+	};
+
+	const handleTrackClick = (e: React.MouseEvent<HTMLSpanElement>) => {
+		if (!trackRef.current) return;
+
+		const rect = trackRef.current.getBoundingClientRect();
+		const clickX = e.clientX - rect.left;
+		const clickPercent = Math.max(0, Math.min(1, clickX / rect.width));
+		const clickValue = Math.round(clickPercent * maxDuration);
+
+		const distanceToStart = Math.abs(clickValue - localValues[0]);
+		const distanceToEnd = Math.abs(clickValue - localValues[1]);
+
+		let newStart = localValues[0];
+		let newEnd = localValues[1];
+
+		if (distanceToStart <= distanceToEnd) {
+			newStart = clickValue;
+
+			if (newEnd - newStart < minDuration) {
+				newEnd = Math.min(maxDuration, newStart + minDuration);
 			}
-			// If moving start thumb
-			else if (newStart !== localValues[0]) {
+
+			if (newEnd - newStart > maxAllowedDuration) {
+				newEnd = Math.min(maxDuration, newStart + maxAllowedDuration);
+			}
+		} else {
+			newEnd = clickValue;
+
+			if (newEnd - newStart < minDuration) {
 				newStart = Math.max(0, newEnd - minDuration);
 			}
-		}
 
-		// Enforce maximum duration constraint
-		if (newEnd - newStart > maxAllowedDuration) {
-			// If moving end thumb
-			if (newEnd !== localValues[1]) {
-				newEnd = Math.min(newStart + maxAllowedDuration, maxDuration);
-			}
-			// If moving start thumb
-			else if (newStart !== localValues[0]) {
+			if (newEnd - newStart > maxAllowedDuration) {
 				newStart = Math.max(0, newEnd - maxAllowedDuration);
 			}
 		}
 
-		// Update local state immediately for responsive UI
-		setLocalValues([newStart, newEnd]);
+		handleValueChange([newStart, newEnd]);
 
-		// Notify parent component
-		onChange(newStart, newEnd);
+		e.stopPropagation();
 	};
-
-	console.log("TimeRangeSlider render:", {
-		localValues,
-		startTime,
-		endTime,
-		maxDuration,
-	});
 
 	return (
 		<div className={cn("space-y-6 p-4", className)}>
@@ -105,10 +112,15 @@ export const TimeRangeSlider = ({
 					min={0}
 					max={maxDuration}
 					step={1}
+					minStepsBetweenThumbs={minDuration}
 					className="relative flex w-full touch-none select-none items-center py-4"
 					id={id}
 				>
-					<Slider.Track className="relative h-3 w-full grow overflow-hidden rounded-full bg-secondary">
+					<Slider.Track
+						className="relative h-3 w-full grow cursor-pointer overflow-hidden rounded-full bg-secondary"
+						onClick={handleTrackClick}
+						ref={trackRef}
+					>
 						<Slider.Range className="absolute h-full bg-primary" />
 					</Slider.Track>
 					<Slider.Thumb

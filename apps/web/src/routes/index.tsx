@@ -213,7 +213,13 @@ function RouteComponent() {
 	return (
 		<div className="h-full">
 			<div className="rounded-xl p-8 shadow-sm">
-				<form onSubmit={form.handleSubmit} className="space-y-8">
+				<form
+					onSubmit={(e) => {
+						e.preventDefault();
+						form.handleSubmit();
+					}}
+					className="space-y-8"
+				>
 					<form.Field name="url">
 						{(field) => (
 							<div className="space-y-3">
