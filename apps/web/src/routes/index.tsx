@@ -2,6 +2,7 @@ import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Download, Loader2, Plus, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import z from "zod/v4";
@@ -23,7 +24,10 @@ function RouteComponent() {
 	const { data: session, isPending: isSessionPending } =
 		authClient.useSession();
 
-	const [player, setPlayer] = useState<any>(null);
+	const [player, setPlayer] = useState<{
+		seekTo: (seconds: number) => void;
+		playVideo: () => void;
+	} | null>(null);
 
 	useEffect(() => {
 		if (!isSessionPending && !session) {
@@ -97,8 +101,8 @@ function RouteComponent() {
 					queryKey: orpc.ringtone.getAll.queryKey(),
 				});
 			},
-			onError: (error) => {
-				toast.error(error.message);
+			onError: (err) => {
+				toast.error(err.message);
 			},
 		}),
 	);
@@ -176,6 +180,23 @@ function RouteComponent() {
 					{
 						message: "Ringtone cannot be longer than 60 seconds",
 					},
+				)
+				.refine(
+					(data) => {
+						if (!videoInfo) return true;
+						return data.endSeconds <= videoInfo.duration;
+					},
+					{
+						message: "End time cannot exceed video duration",
+					},
+				)
+				.refine(
+					(data) => {
+						return data.startSeconds < data.endSeconds;
+					},
+					{
+						message: "Start time must be less than end time",
+					},
 				),
 		},
 	});
@@ -198,8 +219,7 @@ function RouteComponent() {
 					return urlObj.pathname.split("/")[2];
 				}
 			}
-		} catch (error) {
-			// a non-url string will throw an error
+		} catch (_error) {
 			return null;
 		}
 		return null;
@@ -240,13 +260,42 @@ function RouteComponent() {
 		}
 	};
 
+	const handleReset = () => {
+		form.reset();
+		setVideoInfo(null);
+		setVideoUrl("");
+		setActiveRingtone(null);
+	};
+
 	if (isSessionPending) {
 		return <Loader />;
 	}
 
+	const hasUrl = videoUrl.trim().length > 0;
+
 	return (
 		<div className="h-full">
 			<div className="">
+				{/* Simple Branding - Shows only when no URL */}
+				<AnimatePresence>
+					{!hasUrl && (
+						<motion.div
+							initial={{ opacity: 0, y: 20 }}
+							animate={{ opacity: 1, y: 0 }}
+							exit={{ opacity: 0, y: -20 }}
+							transition={{ duration: 0.5 }}
+							className="mb-12 text-center"
+						>
+							<h1 className="mb-4 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text font-bold text-4xl text-transparent">
+								RingTone Creator
+							</h1>
+							<p className="text-lg text-muted-foreground">
+								Transform YouTube videos into custom ringtones
+							</p>
+						</motion.div>
+					)}
+				</AnimatePresence>
+
 				<form
 					onSubmit={(e) => {
 						e.preventDefault();
@@ -276,159 +325,171 @@ function RouteComponent() {
 						)}
 					</form.Field>
 
-					{videoInfo && (
-						<div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-							<div>
-								<div className="space-y-4">
-									<div className="flex items-center space-x-4">
-										{videoInfo.thumbnail && (
-											<img
-												src={videoInfo.thumbnail}
-												alt={videoInfo.title}
-												className="h-24 w-40 rounded-lg object-cover"
+					<AnimatePresence>
+						{videoInfo && (
+							<motion.div
+								initial={{ opacity: 0, y: 20 }}
+								animate={{ opacity: 1, y: 0 }}
+								exit={{ opacity: 0, y: -20 }}
+								transition={{ duration: 0.4 }}
+								className="grid grid-cols-1 gap-8 md:grid-cols-2"
+							>
+								<div>
+									<div className="space-y-4">
+										<div className="flex items-center space-x-4">
+											{videoInfo.thumbnail && (
+												<img
+													src={videoInfo.thumbnail}
+													alt={videoInfo.title}
+													className="h-24 w-40 rounded-lg object-cover"
+												/>
+											)}
+											<div className="flex-1">
+												<p className="font-semibold text-lg">
+													{videoInfo.title}
+												</p>
+												<p className="text-muted-foreground text-sm">
+													{videoInfo.uploader}
+												</p>
+												<p className="text-muted-foreground text-sm">
+													Duration: {secondsToHms(videoInfo.duration)}
+												</p>
+											</div>
+										</div>
+									</div>
+									{videoId && (
+										<div className="mt-4">
+											<YoutubePlayer
+												videoId={videoId}
+												onReady={(e) => {
+													setPlayer(e.target);
+												}}
+											/>
+										</div>
+									)}
+								</div>
+
+								<div className="space-y-6">
+									<form.Field name="fileName">
+										{(field) => (
+											<div className="space-y-3">
+												<Label htmlFor={field.name} className="font-medium">
+													Ringtone Name
+												</Label>
+												<Input
+													id={field.name}
+													name={field.name}
+													value={field.state.value}
+													onBlur={field.handleBlur}
+													onChange={(e) => field.handleChange(e.target.value)}
+													placeholder="My awesome ringtone"
+												/>
+												{field.state.meta.errors.map((error) => (
+													<p
+														key={error?.message}
+														className="text-red-500 text-sm"
+													>
+														{error?.message}
+													</p>
+												))}
+											</div>
+										)}
+									</form.Field>
+
+									<form.Field name="startSeconds">
+										{(field) => (
+											<TimeRangeSlider
+												startTime={field.state.value}
+												endTime={form.state.values.endSeconds}
+												maxDuration={videoInfo.duration}
+												onChange={(start, end) => {
+													form.setFieldValue("startSeconds", start);
+													form.setFieldValue("endSeconds", end);
+													if (player) {
+														player.seekTo(start);
+														player.playVideo();
+													}
+												}}
 											/>
 										)}
-										<div className="flex-1">
-											<p className="font-semibold text-lg">{videoInfo.title}</p>
-											<p className="text-muted-foreground text-sm">
-												{videoInfo.uploader}
-											</p>
-											<p className="text-muted-foreground text-sm">
-												Duration: {secondsToHms(videoInfo.duration)}
-											</p>
-										</div>
-									</div>
+									</form.Field>
+
+									<Button
+										type="submit"
+										className="w-full"
+										disabled={
+											form.state.isSubmitting ||
+											createMutation.isPending ||
+											!videoInfo
+										}
+									>
+										{createMutation.isPending ? (
+											<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+										) : (
+											<Plus className="mr-2 h-4 w-4" />
+										)}
+										Create Ringtone
+									</Button>
 								</div>
-								{videoId && (
-									<div className="mt-4">
-										<YoutubePlayer
-											videoId={videoId}
-											onReady={(e) => {
-												setPlayer(e.target);
-											}}
-										/>
-									</div>
-								)}
-							</div>
-
-							<div className="space-y-6">
-								<form.Field name="fileName">
-									{(field) => (
-										<div className="space-y-3">
-											<Label htmlFor={field.name} className="font-medium">
-												Ringtone Name
-											</Label>
-											<Input
-												id={field.name}
-												name={field.name}
-												value={field.state.value}
-												onBlur={field.handleBlur}
-												onChange={(e) => field.handleChange(e.target.value)}
-												placeholder="My awesome ringtone"
-											/>
-											{field.state.meta.errors.map((error) => (
-												<p
-													key={error?.message}
-													className="text-red-500 text-sm"
-												>
-													{error?.message}
-												</p>
-											))}
-										</div>
-									)}
-								</form.Field>
-
-								<form.Field name="startSeconds">
-									{(field) => (
-										<TimeRangeSlider
-											startTime={field.state.value}
-											endTime={form.state.values.endSeconds}
-											maxDuration={videoInfo.duration}
-											onChange={(start, end) => {
-												form.setFieldValue("startSeconds", start);
-												form.setFieldValue("endSeconds", end);
-												if (player) {
-													player.seekTo(start);
-													player.playVideo();
-												}
-											}}
-										/>
-									)}
-								</form.Field>
-
-								<Button
-									type="submit"
-									className="w-full"
-									disabled={
-										form.state.isSubmitting ||
-										createMutation.isPending ||
-										!videoInfo
-									}
-								>
-									{createMutation.isPending ? (
-										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-									) : (
-										<Plus className="mr-2 h-4 w-4" />
-									)}
-									Create Ringtone
-								</Button>
-							</div>
-						</div>
-					)}
+							</motion.div>
+						)}
+					</AnimatePresence>
 				</form>
 			</div>
 
-			{activeRingtone && (
-				<div className="mt-8">
-					<div className="mb-4 flex items-center justify-between">
-						<div>
-							<h3 className="font-semibold text-lg">Your Ringtone is Ready!</h3>
-							<p className="text-muted-foreground text-sm">
-								{activeRingtone.fileName}.mp3
-							</p>
+			<AnimatePresence>
+				{activeRingtone && (
+					<motion.div
+						initial={{ opacity: 0, y: 20 }}
+						animate={{ opacity: 1, y: 0 }}
+						exit={{ opacity: 0, y: -20 }}
+						transition={{ duration: 0.4 }}
+						className="mt-8"
+					>
+						<div className="mb-4 flex items-center justify-between">
+							<div>
+								<h3 className="font-semibold text-lg">
+									Your Ringtone is Ready!
+								</h3>
+								<p className="text-muted-foreground text-sm">
+									{activeRingtone.fileName}.mp3
+								</p>
+							</div>
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={() => setActiveRingtone(null)}
+							>
+								<X className="h-4 w-4" />
+							</Button>
 						</div>
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => setActiveRingtone(null)}
-						>
-							<X className="h-4 w-4" />
-						</Button>
-					</div>
 
-					<div className="mb-4">
-						<CustomAudioPlayer src={activeRingtone.downloadUrl} autoPlay />
-					</div>
+						<div className="mb-4">
+							<CustomAudioPlayer src={activeRingtone.downloadUrl} autoPlay />
+						</div>
 
-					<div className="flex gap-3">
-						<Button
-							onClick={() => {
-								const link = document.createElement("a");
-								link.href = activeRingtone.downloadUrl;
-								link.download = `${activeRingtone.fileName}.mp3`;
-								document.body.appendChild(link);
-								link.click();
-								document.body.removeChild(link);
-							}}
-							className="flex-1"
-						>
-							<Download className="mr-2 h-4 w-4" />
-							Download Ringtone
-						</Button>
-						<Button
-							variant="outline"
-							onClick={() => {
-								form.reset();
-								setVideoInfo(null);
-								setVideoUrl("");
-								setActiveRingtone(null);
-							}}
-						>
-							Create Another
-						</Button>
-					</div>
-				</div>
-			)}
+						<div className="flex gap-3">
+							<Button
+								onClick={() => {
+									const link = document.createElement("a");
+									link.href = activeRingtone.downloadUrl;
+									link.download = `${activeRingtone.fileName}.mp3`;
+									document.body.appendChild(link);
+									link.click();
+									document.body.removeChild(link);
+								}}
+								className="flex-1"
+							>
+								<Download className="mr-2 h-4 w-4" />
+								Download Ringtone
+							</Button>
+							<Button variant="outline" onClick={handleReset}>
+								Create Another
+							</Button>
+						</div>
+					</motion.div>
+				)}
+			</AnimatePresence>
 		</div>
 	);
 }

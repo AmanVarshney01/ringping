@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
 	Table,
 	TableBody,
@@ -35,7 +36,6 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { secondsToHms } from "@/lib/utils";
 import { orpc, queryClient } from "@/utils/orpc";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 export const Route = createFileRoute("/dashboard")({
 	component: DashboardComponent,
@@ -143,25 +143,6 @@ function DashboardComponent() {
 	return (
 		<div className="grid grid-cols-1">
 			<div className="mb-8">
-				<div className="mb-4 flex items-center justify-between">
-					<div>
-						<h1 className="mb-2 font-light text-3xl text-foreground">
-							Dashboard
-						</h1>
-						<p className="text-muted-foreground">
-							Manage your ringtones, {session?.user.name}
-						</p>
-					</div>
-					<Button
-						variant="outline"
-						onClick={() => navigate({ to: "/" })}
-						className="flex items-center space-x-2"
-					>
-						<Music className="h-4 w-4" />
-						<span>Create New</span>
-					</Button>
-				</div>
-
 				<div className="relative">
 					<Search className="-translate-y-1/2 absolute top-1/2 left-3 h-4 w-4 text-muted-foreground" />
 					<Input

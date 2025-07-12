@@ -77,7 +77,7 @@ const createRingtone = protectedProcedure
 			durationSeconds: z
 				.number()
 				.int()
-				.min(1, "Duration must be at least 1 second")
+				.min(5, "Duration must be at least 5 seconds")
 				.max(60, "Duration cannot exceed 60 seconds"),
 			fileName: z
 				.string()
@@ -95,6 +95,12 @@ const createRingtone = protectedProcedure
 		if (videoDuration && endSeconds > videoDuration) {
 			throw new ORPCError("BAD_REQUEST", {
 				message: `End time (${endSeconds}s) cannot exceed video duration (${videoDuration}s)`,
+			});
+		}
+
+		if (videoDuration && startSeconds >= videoDuration) {
+			throw new ORPCError("BAD_REQUEST", {
+				message: `Start time (${startSeconds}s) cannot be greater than or equal to video duration (${videoDuration}s)`,
 			});
 		}
 
@@ -172,7 +178,6 @@ const createRingtone = protectedProcedure
 
 			const trimmedPath = outputPath.replace(/\.mp3$/, ".trimmed.mp3");
 
-			console.info("=== FFMPEG TRIMMING DEBUG ===");
 			console.info("Original request:", {
 				startSeconds,
 				durationSeconds,
@@ -203,7 +208,6 @@ const createRingtone = protectedProcedure
 			);
 
 			const probeStdout = await new Response(probeProc.stdout).text();
-			const probeStderr = await new Response(probeProc.stderr).text();
 			const probeExitCode = await probeProc.exited;
 
 			if (probeExitCode === 0) {

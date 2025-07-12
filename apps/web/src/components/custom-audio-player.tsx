@@ -26,7 +26,7 @@ export const CustomAudioPlayer: React.FC<CustomAudioPlayerProps> = ({
 	const [isPlaying, setIsPlaying] = React.useState(false);
 	const [duration, setDuration] = React.useState(0);
 	const [currentTime, setCurrentTime] = React.useState(0);
-	const [volume, setVolume] = React.useState(1);
+	const [volume] = React.useState(1);
 	const [isMuted, setIsMuted] = React.useState(false);
 	const [isLoading, setIsLoading] = React.useState(true);
 	const intervalRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -79,7 +79,7 @@ export const CustomAudioPlayer: React.FC<CustomAudioPlayerProps> = ({
 					sound.play();
 				}
 			},
-			onloaderror: (id, error) => {
+			onloaderror: (_id, error) => {
 				console.error("Audio load error:", error);
 				setIsLoading(false);
 				onError?.();

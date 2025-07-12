@@ -1,5 +1,5 @@
 import * as Slider from "@radix-ui/react-slider";
-import * as React from "react";
+import { type MouseEvent, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Label } from "./ui/label";
 
@@ -24,13 +24,13 @@ export const TimeRangeSlider = ({
 	minDuration = 5,
 	maxAllowedDuration = 60,
 }: TimeRangeSliderProps) => {
-	const [localValues, setLocalValues] = React.useState<[number, number]>([
+	const [localValues, setLocalValues] = useState<[number, number]>([
 		startTime,
 		endTime,
 	]);
-	const trackRef = React.useRef<HTMLSpanElement>(null);
+	const trackRef = useRef<HTMLSpanElement>(null);
 
-	React.useEffect(() => {
+	useEffect(() => {
 		console.log("TimePicker - useEffect update:", {
 			startTime,
 			endTime,
@@ -52,11 +52,35 @@ export const TimeRangeSlider = ({
 	const handleValueChange = (newValues: number[]) => {
 		if (!newValues || newValues.length !== 2) return;
 
-		const [newStart, newEnd] = newValues;
+		let [newStart, newEnd] = newValues;
+
+		if (newEnd - newStart < minDuration) {
+			const startDiff = Math.abs(newStart - localValues[0]);
+			const endDiff = Math.abs(newEnd - localValues[1]);
+
+			if (startDiff > endDiff) {
+				newEnd = Math.min(maxDuration, newStart + minDuration);
+			} else {
+				newStart = Math.max(0, newEnd - minDuration);
+			}
+		}
+
+		if (newEnd - newStart > maxAllowedDuration) {
+			const startDiff = Math.abs(newStart - localValues[0]);
+			const endDiff = Math.abs(newEnd - localValues[1]);
+
+			if (startDiff > endDiff) {
+				newEnd = Math.min(maxDuration, newStart + maxAllowedDuration);
+			} else {
+				newStart = Math.max(0, newEnd - maxAllowedDuration);
+			}
+		}
 
 		console.log("TimePicker - handleValueChange:", {
-			newStart,
-			newEnd,
+			originalStart: newValues[0],
+			originalEnd: newValues[1],
+			adjustedStart: newStart,
+			adjustedEnd: newEnd,
 			duration: newEnd - newStart,
 			oldValues: localValues,
 		});
@@ -66,7 +90,22 @@ export const TimeRangeSlider = ({
 		onChange(newStart, newEnd);
 	};
 
-	const handleTrackClick = (e: React.MouseEvent<HTMLSpanElement>) => {
+	const handleValueCommit = (newValues: number[]) => {
+		if (!newValues || newValues.length !== 2) return;
+
+		const [newStart, newEnd] = newValues;
+
+		console.log("TimePicker - handleValueCommit:", {
+			newStart,
+			newEnd,
+			duration: newEnd - newStart,
+			oldValues: localValues,
+		});
+
+		onChange(newStart, newEnd);
+	};
+
+	const handleTrackClick = (e: MouseEvent<HTMLSpanElement>) => {
 		if (!trackRef.current) return;
 
 		const rect = trackRef.current.getBoundingClientRect();
@@ -113,7 +152,7 @@ export const TimeRangeSlider = ({
 				<Label className="font-medium text-sm">Select Time Range</Label>
 				<div className="flex items-center justify-between text-muted-foreground text-xs">
 					<span>Start: {formatTime(localValues[0])}</span>
-					<span>Duration: {duration}s</span>
+					<span className="font-medium">Duration: {duration}s</span>
 					<span>End: {formatTime(localValues[1])}</span>
 				</div>
 			</div>
@@ -122,6 +161,7 @@ export const TimeRangeSlider = ({
 				<Slider.Root
 					value={localValues}
 					onValueChange={handleValueChange}
+					onValueCommit={handleValueCommit}
 					min={0}
 					max={maxDuration}
 					step={1}

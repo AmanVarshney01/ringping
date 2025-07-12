@@ -1,26 +1,16 @@
 import { Link } from "@tanstack/react-router";
-import { LayoutDashboard, Music } from "lucide-react";
+import { LayoutDashboard } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
-import UserMenu from "./user-menu";
 import { ThemeToggle } from "./theme-toggle";
+import UserMenu from "./user-menu";
 
 export default function Header() {
 	const { data: session } = authClient.useSession();
 
 	return (
-		<div className="border-border/40 border-b ">
-			<div className="container mx-auto flex h-16 items-center justify-between px-4">
+		<div className="border-border/40 border-b">
+			<div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
 				<div className="flex items-center space-x-8">
-					<Link
-						to="/"
-						className="flex items-center space-x-2 transition-opacity hover:opacity-80"
-					>
-						<Music className="h-6 w-6 text-primary" />
-						<span className="font-semibold text-foreground text-lg">
-							RingPing
-						</span>
-					</Link>
-
 					{session && (
 						<nav className="flex items-center space-x-6">
 							<Link
