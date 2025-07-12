@@ -121,6 +121,15 @@ function RouteComponent() {
 		},
 		onSubmit: async ({ value }) => {
 			const durationSeconds = value.endSeconds - value.startSeconds;
+			
+			console.log("Form submission - values:", {
+				startSeconds: value.startSeconds,
+				endSeconds: value.endSeconds,
+				durationSeconds,
+				fileName: value.fileName,
+				videoDuration: videoInfo?.duration
+			});
+			
 			toast.promise(
 				async () =>
 					await createMutation.mutateAsync({

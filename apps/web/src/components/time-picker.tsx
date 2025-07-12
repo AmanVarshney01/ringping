@@ -31,6 +31,12 @@ export const TimeRangeSlider = ({
 	const trackRef = React.useRef<HTMLSpanElement>(null);
 
 	React.useEffect(() => {
+		console.log("TimePicker - useEffect update:", {
+			startTime,
+			endTime,
+			duration: endTime - startTime,
+			oldLocalValues: localValues,
+		});
 		setLocalValues([startTime, endTime]);
 	}, [startTime, endTime]);
 
@@ -47,6 +53,13 @@ export const TimeRangeSlider = ({
 		if (!newValues || newValues.length !== 2) return;
 
 		const [newStart, newEnd] = newValues;
+
+		console.log("TimePicker - handleValueChange:", {
+			newStart,
+			newEnd,
+			duration: newEnd - newStart,
+			oldValues: localValues,
+		});
 
 		setLocalValues([newStart, newEnd]);
 

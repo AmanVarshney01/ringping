@@ -35,6 +35,7 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { secondsToHms } from "@/lib/utils";
 import { orpc, queryClient } from "@/utils/orpc";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 export const Route = createFileRoute("/dashboard")({
 	component: DashboardComponent,
@@ -140,7 +141,7 @@ function DashboardComponent() {
 	}
 
 	return (
-		<div className="h-full">
+		<div className="grid grid-cols-1">
 			<div className="mb-8">
 				<div className="mb-4 flex items-center justify-between">
 					<div>
@@ -161,7 +162,6 @@ function DashboardComponent() {
 					</Button>
 				</div>
 
-				{/* Search Bar */}
 				<div className="relative">
 					<Search className="-translate-y-1/2 absolute top-1/2 left-3 h-4 w-4 text-muted-foreground" />
 					<Input
@@ -173,111 +173,112 @@ function DashboardComponent() {
 				</div>
 			</div>
 
-			{/* Ringtones Table */}
-			<div className="rounded-lg border">
-				{ringtonesQuery.isLoading ? (
-					<div className="flex justify-center py-12">
-						<Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-					</div>
-				) : filteredRingtones.length === 0 ? (
-					<div className="py-12 text-center">
-						<Music className="mx-auto mb-4 h-12 w-12 text-muted-foreground opacity-50" />
-						<p className="text-muted-foreground">
-							{searchTerm
-								? "No ringtones match your search."
-								: "No ringtones yet. Create your first one!"}
-						</p>
-					</div>
-				) : (
-					<Table>
-						<TableHeader>
-							<TableRow>
-								<TableHead>Name</TableHead>
-								<TableHead>Duration</TableHead>
-								<TableHead>Source</TableHead>
-								<TableHead>Created</TableHead>
-								<TableHead className="text-right">Actions</TableHead>
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{filteredRingtones.map((ringtone) => (
-								<TableRow key={ringtone.id}>
-									<TableCell className="font-medium">
-										<div className="flex items-center space-x-2">
-											<Music className="h-4 w-4 text-muted-foreground" />
-											<span>{ringtone.fileName}.mp3</span>
-										</div>
-									</TableCell>
-									<TableCell>
-										{secondsToHms(ringtone.startTime)} →{" "}
-										{secondsToHms(ringtone.endTime)}
-									</TableCell>
-									<TableCell>
-										<a
-											href={ringtone.originalUrl}
-											target="_blank"
-											rel="noopener noreferrer"
-											className="block max-w-xs truncate text-blue-600 hover:underline"
-										>
-											{ringtone.originalUrl}
-										</a>
-									</TableCell>
-									<TableCell>
-										{new Date(ringtone.createdAt).toLocaleDateString()}
-									</TableCell>
-									<TableCell className="text-right">
-										<div className="flex items-center justify-end space-x-2">
-											<Button
-												variant="outline"
-												size="sm"
-												onClick={() => {
-													const serverUrl =
-														import.meta.env.VITE_SERVER_URL ||
-														"http://localhost:3000";
-													setActiveRingtone({
-														downloadUrl: `${serverUrl}${ringtone.downloadUrl}`,
-														fileName: ringtone.fileName,
-													});
-													setShowPlayerDialog(true);
-												}}
-											>
-												<Play className="h-4 w-4" />
-											</Button>
-											<Button variant="outline" size="sm" asChild>
-												<a
-													href={`${import.meta.env.VITE_SERVER_URL || "http://localhost:3000"}${ringtone.downloadUrl}`}
-													download
-													target="_blank"
-													className="flex items-center"
-												>
-													<Download className="h-4 w-4" />
-												</a>
-											</Button>
-											<Button
-												variant="outline"
-												size="sm"
-												onClick={() => handleEdit(ringtone)}
-											>
-												<Edit className="h-4 w-4" />
-											</Button>
-											<Button
-												variant="outline"
-												size="sm"
-												onClick={() => handleDelete(ringtone)}
-												className="text-red-600 hover:text-red-700"
-											>
-												<Trash2 className="h-4 w-4" />
-											</Button>
-										</div>
-									</TableCell>
+			<ScrollArea>
+				<div>
+					{ringtonesQuery.isLoading ? (
+						<div className="flex justify-center py-12">
+							<Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+						</div>
+					) : filteredRingtones.length === 0 ? (
+						<div className="py-12 text-center">
+							<Music className="mx-auto mb-4 h-12 w-12 text-muted-foreground opacity-50" />
+							<p className="text-muted-foreground">
+								{searchTerm
+									? "No ringtones match your search."
+									: "No ringtones yet. Create your first one!"}
+							</p>
+						</div>
+					) : (
+						<Table className="w-full">
+							<TableHeader>
+								<TableRow>
+									<TableHead>Name</TableHead>
+									<TableHead>Duration</TableHead>
+									<TableHead>Source</TableHead>
+									<TableHead>Created</TableHead>
+									<TableHead className="text-right">Actions</TableHead>
 								</TableRow>
-							))}
-						</TableBody>
-					</Table>
-				)}
-			</div>
+							</TableHeader>
+							<TableBody>
+								{filteredRingtones.map((ringtone) => (
+									<TableRow key={ringtone.id}>
+										<TableCell className="font-medium">
+											<div className="flex items-center space-x-2">
+												<Music className="h-4 w-4 text-muted-foreground" />
+												<span>{ringtone.fileName}.mp3</span>
+											</div>
+										</TableCell>
+										<TableCell>
+											{secondsToHms(ringtone.startTime)} →{" "}
+											{secondsToHms(ringtone.endTime)}
+										</TableCell>
+										<TableCell>
+											<a
+												href={ringtone.originalUrl}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="block max-w-xs truncate text-blue-600 hover:underline"
+											>
+												{ringtone.originalUrl}
+											</a>
+										</TableCell>
+										<TableCell>
+											{new Date(ringtone.createdAt).toLocaleDateString()}
+										</TableCell>
+										<TableCell className="text-right">
+											<div className="flex items-center justify-end space-x-2">
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => {
+														const serverUrl =
+															import.meta.env.VITE_SERVER_URL ||
+															"http://localhost:3000";
+														setActiveRingtone({
+															downloadUrl: `${serverUrl}${ringtone.downloadUrl}`,
+															fileName: ringtone.fileName,
+														});
+														setShowPlayerDialog(true);
+													}}
+												>
+													<Play className="h-4 w-4" />
+												</Button>
+												<Button variant="outline" size="sm" asChild>
+													<a
+														href={`${import.meta.env.VITE_SERVER_URL || "http://localhost:3000"}${ringtone.downloadUrl}`}
+														download
+														target="_blank"
+														className="flex items-center"
+													>
+														<Download className="h-4 w-4" />
+													</a>
+												</Button>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => handleEdit(ringtone)}
+												>
+													<Edit className="h-4 w-4" />
+												</Button>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => handleDelete(ringtone)}
+													className="text-red-600 hover:text-red-700"
+												>
+													<Trash2 className="h-4 w-4" />
+												</Button>
+											</div>
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
+					)}
+				</div>
+				<ScrollBar orientation="horizontal" />
+			</ScrollArea>
 
-			{/* Edit Dialog */}
 			<Dialog
 				open={!!editingRingtone}
 				onOpenChange={(open) => {
@@ -333,7 +334,6 @@ function DashboardComponent() {
 				</DialogContent>
 			</Dialog>
 
-			{/* Delete Confirmation Dialog */}
 			<Dialog
 				open={!!deletingRingtone}
 				onOpenChange={(open) => {
@@ -372,7 +372,6 @@ function DashboardComponent() {
 				</DialogContent>
 			</Dialog>
 
-			{/* Ringtone Player Dialog */}
 			{activeRingtone && (
 				<RingtonePlayerDialog
 					isOpen={showPlayerDialog}

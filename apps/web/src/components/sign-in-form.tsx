@@ -58,7 +58,6 @@ export default function SignInForm({
 	return (
 		<div className="flex min-h-screen items-center justify-center px-4">
 			<div className="w-full max-w-md">
-				{/* Header */}
 				<div className="mb-8 text-center">
 					<div className="mb-4 flex justify-center">
 						<Music className="h-8 w-8 text-primary" />
@@ -69,7 +68,6 @@ export default function SignInForm({
 					<p className="text-muted-foreground">Sign in to your account</p>
 				</div>
 
-				{/* Form */}
 				<div className="rounded-xl border border-border bg-card p-8 shadow-sm">
 					<form
 						onSubmit={(e) => {
@@ -153,7 +151,6 @@ export default function SignInForm({
 					</form>
 				</div>
 
-				{/* Switch to Sign Up */}
 				<div className="mt-6 text-center">
 					<p className="text-muted-foreground">
 						Don't have an account?{" "}

@@ -2,9 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { ORPCError } from "@orpc/server";
-import { consola } from "consola";
 import { desc, eq } from "drizzle-orm";
-import { execa } from "execa";
 import z from "zod/v4";
 import { db } from "../db";
 import { ringtone } from "../db/schema/ringtone";
@@ -20,19 +18,42 @@ const getVideoInfo = protectedProcedure
 		const { url } = input;
 
 		try {
-			consola.info("Fetching video info for URL:", url);
+			console.info("Fetching video info for URL:", url);
 
-			const { stdout } = await execa(
-				`yt-dlp --print "%(title)s" --print "%(duration)s" --print "%(uploader)s" --print "%(thumbnail)s" --no-download "${url}"`,
-				{ shell: true, timeout: 30000 },
+			const proc = Bun.spawn(
+				[
+					"yt-dlp",
+					"--print",
+					"%(title)s",
+					"--print",
+					"%(duration)s",
+					"--print",
+					"%(uploader)s",
+					"--print",
+					"%(thumbnail)s",
+					"--no-download",
+					url,
+				],
+				{
+					stdout: "pipe",
+					stderr: "pipe",
+				},
 			);
+
+			const stdout = await new Response(proc.stdout).text();
+			const stderr = await new Response(proc.stderr).text();
+			const exitCode = await proc.exited;
+
+			if (exitCode !== 0) {
+				throw new Error(`yt-dlp failed with exit code ${exitCode}: ${stderr}`);
+			}
 
 			const lines = stdout.trim().split("\n");
 			const [title, durationStr, uploader, thumbnail] = lines;
 
 			const duration = Number.parseInt(durationStr, 10) || 0;
 
-			consola.success("Video info fetched successfully:", { title, duration });
+			console.log("Video info fetched successfully:", { title, duration });
 
 			return {
 				title: title || "Unknown",
@@ -41,7 +62,7 @@ const getVideoInfo = protectedProcedure
 				uploader: uploader || "Unknown",
 			};
 		} catch (error) {
-			consola.error("Error getting video info:", error);
+			console.error("Error getting video info:", error);
 			throw new ORPCError("BAD_REQUEST", {
 				message: "Could not fetch video information. Please check the URL.",
 			});
@@ -85,14 +106,14 @@ const createRingtone = protectedProcedure
 		const downloadUrl = `/downloads/${userId}/${fileName}.mp3`;
 
 		try {
-			consola.info("Creating ringtone:", {
+			console.info("Creating ringtone:", {
 				fileName,
 				startSeconds,
 				durationSeconds,
 				userId,
 			});
 
-			consola.info("Downloading time range:", { startSeconds, endSeconds });
+			console.info("Downloading time range:", { startSeconds, endSeconds });
 
 			const formatTime = (seconds: number) => {
 				const h = Math.floor(seconds / 3600);
@@ -104,22 +125,182 @@ const createRingtone = protectedProcedure
 			const startTimeFormatted = formatTime(startSeconds);
 			const endTimeFormatted = formatTime(endSeconds);
 
-			await execa(
-				`yt-dlp -x --audio-format mp3 --audio-quality 192K --download-sections "*${startTimeFormatted}-${endTimeFormatted}" -o "${outputPath}" "${url}"`,
+			console.info("Time range for yt-dlp:", {
+				startTimeFormatted,
+				endTimeFormatted,
+				expectedDuration: endSeconds - startSeconds,
+			});
+
+			const proc = Bun.spawn(
+				[
+					"yt-dlp",
+					"-x",
+					"--audio-format",
+					"mp3",
+					"--audio-quality",
+					"192K",
+					"--download-sections",
+					`*${startTimeFormatted}-${endTimeFormatted}`,
+					"-o",
+					outputPath,
+					url,
+				],
 				{
-					shell: true,
-					timeout: 120000,
+					stdout: "pipe",
+					stderr: "pipe",
 				},
 			);
+
+			const stdout = await new Response(proc.stdout).text();
+			const stderr = await new Response(proc.stderr).text();
+			const exitCode = await proc.exited;
+
+			console.info("yt-dlp output:", { stdout, stderr, exitCode });
+
+			if (exitCode !== 0) {
+				throw new Error(`yt-dlp failed with exit code ${exitCode}: ${stderr}`);
+			}
 
 			const stats = await fs.stat(outputPath);
 			if (stats.size === 0) {
 				throw new Error("Generated file is empty");
 			}
 
-			consola.success("File created:", {
+			console.log("File created:", {
 				size: `${Math.round(stats.size / 1024)}KB`,
 			});
+
+			const trimmedPath = outputPath.replace(/\.mp3$/, ".trimmed.mp3");
+
+			console.info("=== FFMPEG TRIMMING DEBUG ===");
+			console.info("Original request:", {
+				startSeconds,
+				durationSeconds,
+				endSeconds,
+				startTimeFormatted,
+				endTimeFormatted,
+			});
+			console.info("yt-dlp downloaded segment:", {
+				outputPath,
+				originalSize: `${Math.round(stats.size / 1024)}KB`,
+			});
+
+			const probeProc = Bun.spawn(
+				[
+					"ffprobe",
+					"-v",
+					"quiet",
+					"-print_format",
+					"json",
+					"-show_format",
+					"-show_streams",
+					outputPath,
+				],
+				{
+					stdout: "pipe",
+					stderr: "pipe",
+				},
+			);
+
+			const probeStdout = await new Response(probeProc.stdout).text();
+			const probeStderr = await new Response(probeProc.stderr).text();
+			const probeExitCode = await probeProc.exited;
+
+			if (probeExitCode === 0) {
+				try {
+					const probeData = JSON.parse(probeStdout);
+					const duration = Number.parseFloat(probeData.format?.duration || "0");
+					console.info("Downloaded segment info:", {
+						actualDuration: `${duration.toFixed(2)}s`,
+						expectedDuration: `${durationSeconds}s`,
+						difference: `${(duration - durationSeconds).toFixed(2)}s`,
+					});
+				} catch (e) {
+					console.error("Failed to parse ffprobe output:", e);
+				}
+			}
+
+			console.info("Starting ffmpeg trim...");
+			const ffmpegProc = Bun.spawn(
+				[
+					"ffmpeg",
+					"-y",
+					"-i",
+					outputPath,
+					"-ss",
+					"0",
+					"-t",
+					String(durationSeconds),
+					"-acodec",
+					"copy",
+					trimmedPath,
+				],
+				{
+					stdout: "pipe",
+					stderr: "pipe",
+				},
+			);
+
+			const ffmpegStdout = await new Response(ffmpegProc.stdout).text();
+			const ffmpegStderr = await new Response(ffmpegProc.stderr).text();
+			const ffmpegExitCode = await ffmpegProc.exited;
+
+			console.info("ffmpeg command output:", {
+				ffmpegStdout,
+				ffmpegStderr,
+				ffmpegExitCode,
+			});
+
+			if (ffmpegExitCode !== 0) {
+				throw new Error(
+					`ffmpeg trimming failed with exit code ${ffmpegExitCode}: ${ffmpegStderr}`,
+				);
+			}
+
+			const finalProbeProc = Bun.spawn(
+				[
+					"ffprobe",
+					"-v",
+					"quiet",
+					"-print_format",
+					"json",
+					"-show_format",
+					trimmedPath,
+				],
+				{
+					stdout: "pipe",
+					stderr: "pipe",
+				},
+			);
+
+			const finalProbeStdout = await new Response(finalProbeProc.stdout).text();
+			const finalProbeExitCode = await finalProbeProc.exited;
+
+			if (finalProbeExitCode === 0) {
+				try {
+					const finalProbeData = JSON.parse(finalProbeStdout);
+					const finalDuration = Number.parseFloat(
+						finalProbeData.format?.duration || "0",
+					);
+					console.info("Final trimmed file info:", {
+						finalDuration: `${finalDuration.toFixed(2)}s`,
+						requestedDuration: `${durationSeconds}s`,
+						accuracy: `${Math.abs(finalDuration - durationSeconds).toFixed(2)}s off`,
+					});
+				} catch (e) {
+					console.error("Failed to parse final ffprobe output:", e);
+				}
+			}
+
+			await fs.unlink(outputPath);
+			await fs.rename(trimmedPath, outputPath);
+
+			const finalStats = await fs.stat(outputPath);
+			console.log("Audio trimmed successfully:", {
+				finalSize: `${Math.round(finalStats.size / 1024)}KB`,
+				exactDuration: `${durationSeconds}s`,
+			});
+			console.info("=== END FFMPEG TRIMMING DEBUG ===");
 
 			await db.insert(ringtone).values({
 				id: ringtoneId,
@@ -131,7 +312,7 @@ const createRingtone = protectedProcedure
 				userId,
 			});
 
-			consola.success("Ringtone created successfully:", {
+			console.log("Ringtone created successfully:", {
 				fileName,
 				downloadUrl,
 			});
@@ -140,12 +321,12 @@ const createRingtone = protectedProcedure
 				downloadUrl: downloadUrl,
 			};
 		} catch (error) {
-			consola.error("Error creating ringtone:", error);
+			console.error("Error creating ringtone:", error);
 
 			try {
 				await fs.unlink(outputPath);
 			} catch (cleanupError) {
-				consola.error("Cleanup error:", cleanupError);
+				console.error("Cleanup error:", cleanupError);
 			}
 
 			throw new ORPCError("INTERNAL_SERVER_ERROR", {
@@ -156,7 +337,7 @@ const createRingtone = protectedProcedure
 
 const getRingtones = protectedProcedure.handler(async ({ context }) => {
 	const userId = context.session.user.id;
-	consola.info("Fetching ringtones for user:", userId);
+	console.info("Fetching ringtones for user:", userId);
 
 	const userRingtones = await db
 		.select()
@@ -164,7 +345,7 @@ const getRingtones = protectedProcedure.handler(async ({ context }) => {
 		.where(eq(ringtone.userId, userId))
 		.orderBy(desc(ringtone.createdAt));
 
-	consola.info("Found ringtones:", userRingtones.length);
+	console.info("Found ringtones:", userRingtones.length);
 
 	return userRingtones;
 });
@@ -184,7 +365,7 @@ const updateRingtone = protectedProcedure
 		const userId = context.session.user.id;
 
 		try {
-			consola.info("Updating ringtone:", { id, fileName, userId });
+			console.info("Updating ringtone:", { id, fileName, userId });
 
 			const existingRingtone = await db
 				.select()
@@ -212,11 +393,11 @@ const updateRingtone = protectedProcedure
 				})
 				.where(eq(ringtone.id, id));
 
-			consola.success("Ringtone updated successfully:", { id, fileName });
+			console.log("Ringtone updated successfully:", { id, fileName });
 
 			return { success: true };
 		} catch (error) {
-			consola.error("Error updating ringtone:", error);
+			console.error("Error updating ringtone:", error);
 			if (error instanceof ORPCError) {
 				throw error;
 			}
@@ -237,7 +418,7 @@ const deleteRingtone = protectedProcedure
 		const userId = context.session.user.id;
 
 		try {
-			consola.info("Deleting ringtone:", { id, userId });
+			console.info("Deleting ringtone:", { id, userId });
 
 			const existingRingtone = await db
 				.select()
@@ -268,16 +449,16 @@ const deleteRingtone = protectedProcedure
 					ringtoneData.downloadUrl,
 				);
 				await fs.unlink(filePath);
-				consola.info("File deleted:", filePath);
+				console.info("File deleted:", filePath);
 			} catch (fileError) {
-				consola.warn("Could not delete file (file may not exist):", fileError);
+				console.warn("Could not delete file (file may not exist):", fileError);
 			}
 
-			consola.success("Ringtone deleted successfully:", { id });
+			console.log("Ringtone deleted successfully:", { id });
 
 			return { success: true };
 		} catch (error) {
-			consola.error("Error deleting ringtone:", error);
+			console.error("Error deleting ringtone:", error);
 			if (error instanceof ORPCError) {
 				throw error;
 			}

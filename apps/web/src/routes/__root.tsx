@@ -56,7 +56,7 @@ function RootDocument() {
 				<div className="grid h-svh grid-rows-[auto_1fr]">
 					<Header />
 					<ScrollArea className="h-full overflow-hidden">
-						<div className="container mx-auto py-8">
+						<div className="mx-auto max-w-7xl px-4 py-8">
 							{isFetching ? <Loader /> : <Outlet />}
 						</div>
 					</ScrollArea>
