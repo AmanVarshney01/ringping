@@ -14,6 +14,7 @@ import { Toaster } from "@/components/ui/sonner";
 import type { orpc } from "@/utils/orpc";
 import Header from "../components/header";
 import appCss from "../index.css?url";
+import { ThemeProvider } from "@/components/theme-provider";
 export interface RouterAppContext {
 	orpc: typeof orpc;
 	queryClient: QueryClient;
@@ -53,18 +54,25 @@ function RootDocument() {
 				<HeadContent />
 			</head>
 			<body>
-				<div className="grid h-svh grid-rows-[auto_1fr]">
-					<Header />
-					<ScrollArea className="h-full overflow-hidden">
-						<div className="mx-auto max-w-7xl px-4 py-8">
-							{isFetching ? <Loader /> : <Outlet />}
-						</div>
-					</ScrollArea>
-				</div>
-				<Toaster richColors />
-				<TanStackRouterDevtools position="bottom-left" />
-				<ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
-				<Scripts />
+				<ThemeProvider
+					attribute="class"
+					defaultTheme="system"
+					enableSystem
+					disableTransitionOnChange
+				>
+					<div className="grid h-svh grid-rows-[auto_1fr]">
+						<Header />
+						<ScrollArea className="h-full overflow-hidden">
+							<div className="mx-auto max-w-7xl px-4 py-8">
+								{isFetching ? <Loader /> : <Outlet />}
+							</div>
+						</ScrollArea>
+					</div>
+					<Toaster richColors />
+					<TanStackRouterDevtools position="bottom-left" />
+					<ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
+					<Scripts />
+				</ThemeProvider>
 			</body>
 		</html>
 	);

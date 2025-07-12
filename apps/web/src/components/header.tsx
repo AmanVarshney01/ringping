@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { LayoutDashboard, Music } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import UserMenu from "./user-menu";
+import { ThemeToggle } from "./theme-toggle";
 
 export default function Header() {
 	const { data: session } = authClient.useSession();
@@ -44,8 +45,10 @@ export default function Header() {
 						</nav>
 					)}
 				</div>
-
-				<UserMenu />
+				<div className=" flex flex-row gap-2 ">
+					<ThemeToggle />
+					<UserMenu />
+				</div>
 			</div>
 		</div>
 	);
