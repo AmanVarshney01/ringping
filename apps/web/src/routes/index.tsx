@@ -1,12 +1,12 @@
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Loader2, Plus } from "lucide-react";
+import { Download, Loader2, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import z from "zod/v4";
+import { CustomAudioPlayer } from "@/components/custom-audio-player";
 import Loader from "@/components/loader";
-import { RingtonePlayerDialog } from "@/components/ringtone-player-dialog";
 import { TimeRangeSlider } from "@/components/time-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,7 +48,6 @@ function RouteComponent() {
 		thumbnail: string | null;
 		uploader: string;
 	} | null>(null);
-	const [showPlayerDialog, setShowPlayerDialog] = useState(false);
 	const [activeRingtone, setActiveRingtone] = useState<{
 		downloadUrl: string;
 		fileName: string;
@@ -94,13 +93,9 @@ function RouteComponent() {
 					downloadUrl: `${serverUrl}${data.downloadUrl}`,
 					fileName,
 				});
-				setShowPlayerDialog(true);
 				queryClient.invalidateQueries({
 					queryKey: orpc.ringtone.getAll.queryKey(),
 				});
-				// form.reset();
-				// setVideoInfo(null);
-				// setVideoUrl("");
 			},
 			onError: (error) => {
 				toast.error(error.message);
@@ -251,7 +246,7 @@ function RouteComponent() {
 
 	return (
 		<div className="h-full">
-			<div className="rounded-xl p-8 shadow-sm">
+			<div className="">
 				<form
 					onSubmit={(e) => {
 						e.preventDefault();
@@ -382,16 +377,57 @@ function RouteComponent() {
 					)}
 				</form>
 			</div>
+
 			{activeRingtone && (
-				<RingtonePlayerDialog
-					isOpen={showPlayerDialog}
-					onClose={() => {
-						setShowPlayerDialog(false);
-						setActiveRingtone(null);
-					}}
-					audioUrl={activeRingtone.downloadUrl}
-					fileName={activeRingtone.fileName}
-				/>
+				<div className="mt-8">
+					<div className="mb-4 flex items-center justify-between">
+						<div>
+							<h3 className="font-semibold text-lg">Your Ringtone is Ready!</h3>
+							<p className="text-muted-foreground text-sm">
+								{activeRingtone.fileName}.mp3
+							</p>
+						</div>
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => setActiveRingtone(null)}
+						>
+							<X className="h-4 w-4" />
+						</Button>
+					</div>
+
+					<div className="mb-4">
+						<CustomAudioPlayer src={activeRingtone.downloadUrl} autoPlay />
+					</div>
+
+					<div className="flex gap-3">
+						<Button
+							onClick={() => {
+								const link = document.createElement("a");
+								link.href = activeRingtone.downloadUrl;
+								link.download = `${activeRingtone.fileName}.mp3`;
+								document.body.appendChild(link);
+								link.click();
+								document.body.removeChild(link);
+							}}
+							className="flex-1"
+						>
+							<Download className="mr-2 h-4 w-4" />
+							Download Ringtone
+						</Button>
+						<Button
+							variant="outline"
+							onClick={() => {
+								form.reset();
+								setVideoInfo(null);
+								setVideoUrl("");
+								setActiveRingtone(null);
+							}}
+						>
+							Create Another
+						</Button>
+					</div>
+				</div>
 			)}
 		</div>
 	);

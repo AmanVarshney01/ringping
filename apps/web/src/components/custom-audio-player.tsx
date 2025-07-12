@@ -1,7 +1,8 @@
 /** biome-ignore-all lint/suspicious/noArrayIndexKey: <explanation> */
+
+import { Howl } from "howler";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import * as React from "react";
-import { Howl } from "howler";
 import { Button } from "./ui/button";
 
 interface CustomAudioPlayerProps {
@@ -178,9 +179,7 @@ export const CustomAudioPlayer: React.FC<CustomAudioPlayerProps> = ({
 	}
 
 	return (
-		<div
-			className={`space-y-4 rounded-lg border bg-card p-6 shadow-sm ${className}`}
-		>
+		<div className={`space-y-4 ${className}`}>
 			<div className="flex items-center justify-between">
 				<div className="flex items-center space-x-4">
 					<Button
@@ -225,7 +224,7 @@ export const CustomAudioPlayer: React.FC<CustomAudioPlayerProps> = ({
 				aria-label="Seek audio"
 			>
 				<div
-					className="absolute left-0 top-0 h-full rounded-full bg-primary transition-all duration-150"
+					className="absolute top-0 left-0 h-full rounded-full bg-primary transition-all duration-150"
 					style={{ width: `${progressPercentage}%` }}
 				/>
 			</button>
