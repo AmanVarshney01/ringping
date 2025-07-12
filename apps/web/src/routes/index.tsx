@@ -150,54 +150,18 @@ function RouteComponent() {
 			);
 		},
 		validators: {
-			onSubmit: z
-				.object({
-					url: z.url("Please enter a valid URL"),
-					startSeconds: z.number().min(0, "Start time must be 0 or greater"),
-					endSeconds: z.number().min(1, "End time must be greater than 0"),
-					fileName: z
-						.string()
-						.min(1, "File name cannot be empty")
-						.max(50, "File name too long")
-						.refine((name) => !/[<>:"/\\|?*]/.test(name), {
-							message: "File name contains invalid characters",
-						}),
-				})
-				.refine(
-					(data) => {
-						const duration = data.endSeconds - data.startSeconds;
-						return duration >= 5;
-					},
-					{
-						message: "Ringtone must be at least 5 seconds long",
-					},
-				)
-				.refine(
-					(data) => {
-						const duration = data.endSeconds - data.startSeconds;
-						return duration <= 60;
-					},
-					{
-						message: "Ringtone cannot be longer than 60 seconds",
-					},
-				)
-				.refine(
-					(data) => {
-						if (!videoInfo) return true;
-						return data.endSeconds <= videoInfo.duration;
-					},
-					{
-						message: "End time cannot exceed video duration",
-					},
-				)
-				.refine(
-					(data) => {
-						return data.startSeconds < data.endSeconds;
-					},
-					{
-						message: "Start time must be less than end time",
-					},
-				),
+			onSubmit: z.object({
+				url: z.url("Please enter a valid URL"),
+				startSeconds: z.number().min(0, "Start time must be 0 or greater"),
+				endSeconds: z.number().min(1, "End time must be greater than 0"),
+				fileName: z
+					.string()
+					.min(1, "File name cannot be empty")
+					.max(50, "File name too long")
+					.refine((name) => !/[<>:"/\\|?*]/.test(name), {
+						message: "File name contains invalid characters",
+					}),
+			}),
 		},
 	});
 
@@ -276,7 +240,6 @@ function RouteComponent() {
 	return (
 		<div className="h-full">
 			<div className="">
-				{/* Simple Branding - Shows only when no URL */}
 				<AnimatePresence>
 					{!hasUrl && (
 						<motion.div
@@ -324,7 +287,6 @@ function RouteComponent() {
 							</div>
 						)}
 					</form.Field>
-
 					<AnimatePresence>
 						{videoInfo && (
 							<motion.div
@@ -368,7 +330,6 @@ function RouteComponent() {
 										</div>
 									)}
 								</div>
-
 								<div className="space-y-6">
 									<form.Field name="fileName">
 										{(field) => (
@@ -395,7 +356,6 @@ function RouteComponent() {
 											</div>
 										)}
 									</form.Field>
-
 									<form.Field name="startSeconds">
 										{(field) => (
 											<TimeRangeSlider
@@ -413,7 +373,6 @@ function RouteComponent() {
 											/>
 										)}
 									</form.Field>
-
 									<Button
 										type="submit"
 										className="w-full"
