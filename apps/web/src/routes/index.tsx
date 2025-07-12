@@ -1,7 +1,7 @@
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { AlertTriangle, Loader2, Play, Plus } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import z from "zod/v4";
@@ -11,6 +11,7 @@ import { TimeRangeSlider } from "@/components/time-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { YoutubePlayer } from "@/components/youtube-player";
 import { authClient } from "@/lib/auth-client";
 import { orpc, queryClient } from "@/utils/orpc";
 
@@ -21,6 +22,8 @@ export const Route = createFileRoute("/")({
 function RouteComponent() {
 	const { data: session, isPending: isSessionPending } =
 		authClient.useSession();
+
+	const [player, setPlayer] = useState<any>(null);
 
 	useEffect(() => {
 		if (!isSessionPending && !session) {
@@ -38,6 +41,7 @@ function RouteComponent() {
 	}, [session, isSessionPending]);
 
 	const [videoUrl, setVideoUrl] = useState("");
+	const [videoId, setVideoId] = useState<string | null>(null);
 	const [videoInfo, setVideoInfo] = useState<{
 		title: string;
 		duration: number;
@@ -121,15 +125,15 @@ function RouteComponent() {
 		},
 		onSubmit: async ({ value }) => {
 			const durationSeconds = value.endSeconds - value.startSeconds;
-			
+
 			console.log("Form submission - values:", {
 				startSeconds: value.startSeconds,
 				endSeconds: value.endSeconds,
 				durationSeconds,
 				fileName: value.fileName,
-				videoDuration: videoInfo?.duration
+				videoDuration: videoInfo?.duration,
 			});
-			
+
 			toast.promise(
 				async () =>
 					await createMutation.mutateAsync({
@@ -181,9 +185,35 @@ function RouteComponent() {
 		},
 	});
 
+	function getYouTubeVideoId(url: string): string | null {
+		if (!url) return null;
+		try {
+			const urlObj = new URL(url);
+			if (urlObj.hostname === "youtu.be") {
+				return urlObj.pathname.slice(1);
+			}
+			if (
+				urlObj.hostname === "www.youtube.com" ||
+				urlObj.hostname === "youtube.com"
+			) {
+				if (urlObj.pathname === "/watch") {
+					return urlObj.searchParams.get("v");
+				}
+				if (urlObj.pathname.startsWith("/embed/")) {
+					return urlObj.pathname.split("/")[2];
+				}
+			}
+		} catch (error) {
+			// a non-url string will throw an error
+			return null;
+		}
+		return null;
+	}
+
 	const handleUrlChange = (url: string) => {
 		setVideoUrl(url);
 		form.setFieldValue("url", url);
+		setVideoId(getYouTubeVideoId(url));
 
 		if (!url.trim()) {
 			setVideoInfo(null);
@@ -252,110 +282,103 @@ function RouteComponent() {
 					</form.Field>
 
 					{videoInfo && (
-						<div className="rounded-lg border border-border bg-muted/20 p-4">
-							<div className="flex items-start space-x-4">
-								{videoInfo.thumbnail && (
-									<img
-										src={videoInfo.thumbnail}
-										alt="Video thumbnail"
-										className="h-15 w-20 rounded-md object-cover"
-									/>
-								)}
-								<div className="min-w-0 flex-1">
-									<div className="mb-2 flex items-center space-x-2">
-										<Play className="h-4 w-4 text-primary" />
-										<h3 className="truncate font-medium text-foreground">
-											{videoInfo.title}
-										</h3>
+						<div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+							<div>
+								<div className="space-y-4">
+									<div className="flex items-center space-x-4">
+										{videoInfo.thumbnail && (
+											<img
+												src={videoInfo.thumbnail}
+												alt={videoInfo.title}
+												className="h-24 w-40 rounded-lg object-cover"
+											/>
+										)}
+										<div className="flex-1">
+											<p className="font-semibold text-lg">{videoInfo.title}</p>
+											<p className="text-muted-foreground text-sm">
+												{videoInfo.uploader}
+											</p>
+											<p className="text-muted-foreground text-sm">
+												Duration: {secondsToHms(videoInfo.duration)}
+											</p>
+										</div>
 									</div>
-									<p className="mb-1 text-muted-foreground text-sm">
-										By {videoInfo.uploader}
-									</p>
-									<p className="font-medium text-primary text-sm">
-										Duration: {secondsToHms(videoInfo.duration)}
-									</p>
 								</div>
+								{videoId && (
+									<div className="mt-4">
+										<YoutubePlayer
+											videoId={videoId}
+											onReady={(e) => {
+												setPlayer(e.target);
+											}}
+										/>
+									</div>
+								)}
+							</div>
+
+							<div className="space-y-6">
+								<form.Field name="fileName">
+									{(field) => (
+										<div className="space-y-3">
+											<Label htmlFor={field.name} className="font-medium">
+												Ringtone Name
+											</Label>
+											<Input
+												id={field.name}
+												name={field.name}
+												value={field.state.value}
+												onBlur={field.handleBlur}
+												onChange={(e) => field.handleChange(e.target.value)}
+												placeholder="My awesome ringtone"
+											/>
+											{field.state.meta.errors.map((error) => (
+												<p
+													key={error?.message}
+													className="text-red-500 text-sm"
+												>
+													{error?.message}
+												</p>
+											))}
+										</div>
+									)}
+								</form.Field>
+
+								<form.Field name="startSeconds">
+									{(field) => (
+										<TimeRangeSlider
+											startTime={field.state.value}
+											endTime={form.state.values.endSeconds}
+											maxDuration={videoInfo.duration}
+											onChange={(start, end) => {
+												form.setFieldValue("startSeconds", start);
+												form.setFieldValue("endSeconds", end);
+												if (player) {
+													player.seekTo(start);
+													player.playVideo();
+												}
+											}}
+										/>
+									)}
+								</form.Field>
+
+								<Button
+									type="submit"
+									className="w-full"
+									disabled={
+										form.state.isSubmitting ||
+										createMutation.isPending ||
+										!videoInfo
+									}
+								>
+									{createMutation.isPending ? (
+										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+									) : (
+										<Plus className="mr-2 h-4 w-4" />
+									)}
+									Create Ringtone
+								</Button>
 							</div>
 						</div>
-					)}
-
-					{videoInfo && videoInfo.duration < 30 && (
-						<div className="flex items-center space-x-2 rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20">
-							<AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-							<p className="text-sm text-yellow-800 dark:text-yellow-200">
-								This video is quite short ({secondsToHms(videoInfo.duration)}
-								). Make sure your ringtone times fit within this duration.
-							</p>
-						</div>
-					)}
-
-					{videoInfo && (
-						<TimeRangeSlider
-							startTime={form.state.values.startSeconds}
-							endTime={form.state.values.endSeconds}
-							maxDuration={videoInfo.duration}
-							minDuration={5}
-							maxAllowedDuration={60}
-							onChange={(start, end) => {
-								form.setFieldValue("startSeconds", start);
-								form.setFieldValue("endSeconds", end);
-							}}
-						/>
-					)}
-
-					{videoInfo && (
-						<form.Field name="fileName">
-							{(field) => (
-								<div className="space-y-3">
-									<Label htmlFor={field.name} className="font-medium text-base">
-										File Name
-									</Label>
-									<Input
-										id={field.name}
-										name={field.name}
-										type="text"
-										value={field.state.value}
-										onBlur={field.handleBlur}
-										onChange={(e) => field.handleChange(e.target.value)}
-										className="h-12 text-base"
-									/>
-									{field.state.meta.errors.map((error) => (
-										<p key={error?.message} className="text-red-500 text-sm">
-											{error?.message}
-										</p>
-									))}
-								</div>
-							)}
-						</form.Field>
-					)}
-
-					<form.Subscribe>
-						{(state) => (
-							<Button
-								type="submit"
-								className="h-12 w-full font-medium text-base"
-								disabled={
-									!state.canSubmit || createMutation.isPending || !videoInfo
-								}
-							>
-								{createMutation.isPending ? (
-									<Loader2 className="mr-2 h-5 w-5 animate-spin" />
-								) : (
-									<Plus className="mr-2 h-5 w-5" />
-								)}
-								{createMutation.isPending
-									? "Creating..."
-									: session
-										? "Create & Save Ringtone"
-										: "Create Ringtone"}
-							</Button>
-						)}
-					</form.Subscribe>
-
-					{!videoInfo && videoUrl && !videoInfoMutation.isPending && (
-						<p className="text-center text-muted-foreground text-sm">
-							Please enter a valid video URL to continue
-						</p>
 					)}
 				</form>
 			</div>
