@@ -3,12 +3,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { ORPCError } from "@orpc/server";
 import { desc, eq } from "drizzle-orm";
-import z from "zod/v4";
+import z from "zod";
 import { db } from "../db";
 import { ringtone } from "../db/schema/ringtone";
 import { protectedProcedure } from "../lib/orpc";
 
-// Helper function to generate unique filename
 const generateUniqueFileName = async (
 	baseName: string,
 	userId: string,
@@ -67,7 +66,6 @@ const getVideoInfo = protectedProcedure
 		);
 
 		const stdout = await new Response(proc.stdout).text();
-		const stderr = await new Response(proc.stderr).text();
 		const exitCode = await proc.exited;
 
 		if (exitCode !== 0) {
@@ -103,11 +101,30 @@ const createRingtone = protectedProcedure
 				.min(1, "File name is required")
 				.max(50, "File name too long"),
 			videoDuration: z.number().optional(),
+			audioFormat: z.enum([
+				"mp3",
+				"aac",
+				"flac",
+				"m4a",
+				"opus",
+				"vorbis",
+				"wav",
+			]),
+			audioQuality: z
+				.string()
+				.regex(/^(\d+K?|[0-9]|10)$/, "Invalid audio quality format"),
 		}),
 	)
 	.handler(async ({ input, context }) => {
-		const { url, startSeconds, durationSeconds, fileName, videoDuration } =
-			input;
+		const {
+			url,
+			startSeconds,
+			durationSeconds,
+			fileName,
+			videoDuration,
+			audioFormat,
+			audioQuality,
+		} = input;
 		const userId = context.session.user.id;
 		const endSeconds = startSeconds + durationSeconds;
 
@@ -129,8 +146,8 @@ const createRingtone = protectedProcedure
 		await fs.mkdir(outputDir, { recursive: true });
 
 		const ringtoneId = crypto.randomUUID();
-		const outputPath = path.join(outputDir, `${uniqueFileName}.mp3`);
-		const downloadUrl = `/downloads/${userId}/${uniqueFileName}.mp3`;
+		const outputPath = path.join(outputDir, `${uniqueFileName}.${audioFormat}`);
+		const downloadUrl = `/downloads/${userId}/${uniqueFileName}.${audioFormat}`;
 
 		const formatTime = (seconds: number) => {
 			const h = Math.floor(seconds / 3600);
@@ -147,9 +164,9 @@ const createRingtone = protectedProcedure
 				"yt-dlp",
 				"-x",
 				"--audio-format",
-				"mp3",
+				audioFormat,
 				"--audio-quality",
-				"192K",
+				audioQuality,
 				"--download-sections",
 				`*${startTimeFormatted}-${endTimeFormatted}`,
 				"-o",
@@ -170,7 +187,10 @@ const createRingtone = protectedProcedure
 			});
 		}
 
-		const trimmedPath = outputPath.replace(/\.mp3$/, ".trimmed.mp3");
+		const trimmedPath = outputPath.replace(
+			new RegExp(`\\.${audioFormat}$`),
+			`.trimmed.${audioFormat}`,
+		);
 
 		const ffmpegProc = Bun.spawn(
 			[
@@ -206,6 +226,8 @@ const createRingtone = protectedProcedure
 			startTime: startSeconds,
 			endTime: endSeconds,
 			downloadUrl,
+			audioFormat,
+			audioQuality,
 			userId,
 		});
 

@@ -1,3 +1,4 @@
+import { formSchema } from "@ringping/types";
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
@@ -5,13 +6,20 @@ import { Download, Loader2, Plus, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import z from "zod/v4";
+import type z from "zod";
 import { CustomAudioPlayer } from "@/components/custom-audio-player";
 import Loader from "@/components/loader";
 import { TimeRangeSlider } from "@/components/time-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { YoutubePlayer } from "@/components/youtube-player";
 import { authClient } from "@/lib/auth-client";
 import { orpc, queryClient } from "@/utils/orpc";
@@ -92,10 +100,11 @@ function RouteComponent() {
 		orpc.ringtone.create.mutationOptions({
 			onSuccess: (data) => {
 				const fileName = form.state.values.fileName;
+				const audioFormat = form.state.values.audioFormat;
 				const serverUrl = import.meta.env.VITE_SERVER_URL;
 				setActiveRingtone({
 					downloadUrl: `${serverUrl}${data.downloadUrl}`,
-					fileName,
+					fileName: `${fileName}.${audioFormat}`,
 				});
 				queryClient.invalidateQueries({
 					queryKey: orpc.ringtone.getAll.queryKey(),
@@ -115,13 +124,17 @@ function RouteComponent() {
 		return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 	};
 
+	const defaultValues: z.Infer<typeof formSchema> = {
+		url: "",
+		startSeconds: 0,
+		endSeconds: 30,
+		fileName: "",
+		audioFormat: "mp3",
+		audioQuality: "192K",
+	};
+
 	const form = useForm({
-		defaultValues: {
-			url: "",
-			startSeconds: 0,
-			endSeconds: 30,
-			fileName: "",
-		},
+		defaultValues,
 		onSubmit: async ({ value }) => {
 			const durationSeconds = value.endSeconds - value.startSeconds;
 
@@ -130,6 +143,8 @@ function RouteComponent() {
 				endSeconds: value.endSeconds,
 				durationSeconds,
 				fileName: value.fileName,
+				audioFormat: value.audioFormat,
+				audioQuality: value.audioQuality,
 				videoDuration: videoInfo?.duration,
 			});
 
@@ -140,6 +155,8 @@ function RouteComponent() {
 						startSeconds: value.startSeconds,
 						durationSeconds,
 						fileName: value.fileName,
+						audioFormat: value.audioFormat,
+						audioQuality: value.audioQuality,
 						videoDuration: videoInfo?.duration,
 					}),
 				{
@@ -150,18 +167,7 @@ function RouteComponent() {
 			);
 		},
 		validators: {
-			onSubmit: z.object({
-				url: z.url("Please enter a valid URL"),
-				startSeconds: z.number().min(0, "Start time must be 0 or greater"),
-				endSeconds: z.number().min(1, "End time must be greater than 0"),
-				fileName: z
-					.string()
-					.min(1, "File name cannot be empty")
-					.max(50, "File name too long")
-					.refine((name) => !/[<>:"/\\|?*]/.test(name), {
-						message: "File name contains invalid characters",
-					}),
-			}),
+			onChange: formSchema,
 		},
 	});
 
@@ -235,13 +241,13 @@ function RouteComponent() {
 		return <Loader />;
 	}
 
-	const hasUrl = videoUrl.trim().length > 0;
+	// const hasUrl = videoUrl.trim().length > 0;
 
 	return (
 		<div className="h-full">
 			<div className="">
 				<AnimatePresence>
-					{!hasUrl && (
+					{!videoInfo && (
 						<motion.div
 							initial={{ opacity: 0, y: 20 }}
 							animate={{ opacity: 1, y: 0 }}
@@ -266,7 +272,18 @@ function RouteComponent() {
 					}}
 					className="space-y-8"
 				>
-					<form.Field name="url">
+					<form.Field
+						name="url"
+						asyncDebounceMs={500}
+						validators={{
+							onChange: ({ value }) =>
+								!value
+									? "URL is required"
+									: !/^https?:\/\/.+/.test(value)
+										? "Please enter a valid URL"
+										: undefined,
+						}}
+					>
 						{(field) => (
 							<div className="space-y-3">
 								<Input
@@ -279,11 +296,9 @@ function RouteComponent() {
 									onChange={(e) => handleUrlChange(e.target.value)}
 									className="h-12"
 								/>
-								{field.state.meta.errors.map((error) => (
-									<p key={error?.message} className="text-red-500 text-sm">
-										{error?.message}
-									</p>
-								))}
+								{!field.state.meta.isValid && (
+									<em role="alert">{field.state.meta.errors.join(", ")}</em>
+								)}
 							</div>
 						)}
 					</form.Field>
@@ -293,7 +308,7 @@ function RouteComponent() {
 								initial={{ opacity: 0, y: 20 }}
 								animate={{ opacity: 1, y: 0 }}
 								exit={{ opacity: 0, y: -20 }}
-								transition={{ duration: 0.4 }}
+								transition={{ duration: 0.2, delay: 0.5 }}
 								className="grid grid-cols-1 gap-8 md:grid-cols-2"
 							>
 								<div>
@@ -331,7 +346,19 @@ function RouteComponent() {
 									)}
 								</div>
 								<div className="space-y-6">
-									<form.Field name="fileName">
+									<form.Field
+										name="fileName"
+										validators={{
+											onChange: ({ value }) =>
+												!value
+													? "File name is required"
+													: value.length > 50
+														? "File name too long"
+														: /[<>:"/\\|?*]/.test(value)
+															? "File name contains invalid characters"
+															: undefined,
+										}}
+									>
 										{(field) => (
 											<div className="space-y-3">
 												<Label htmlFor={field.name} className="font-medium">
@@ -345,18 +372,123 @@ function RouteComponent() {
 													onChange={(e) => field.handleChange(e.target.value)}
 													placeholder="My awesome ringtone"
 												/>
-												{field.state.meta.errors.map((error) => (
-													<p
-														key={error?.message}
-														className="text-red-500 text-sm"
-													>
-														{error?.message}
-													</p>
-												))}
 											</div>
 										)}
 									</form.Field>
-									<form.Field name="startSeconds">
+
+									<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+										<form.Field
+											name="audioFormat"
+											validators={{
+												onChange: ({ value }) =>
+													![
+														"mp3",
+														"aac",
+														"flac",
+														"m4a",
+														"opus",
+														"vorbis",
+														"wav",
+													].includes(value)
+														? "Please select a valid audio format"
+														: undefined,
+											}}
+										>
+											{(field) => (
+												<div className="space-y-3">
+													<Label htmlFor={field.name} className="font-medium">
+														Audio Format
+													</Label>
+													<Select
+														value={field.state.value}
+														onValueChange={(value) =>
+															field.handleChange(
+																value as typeof field.state.value,
+															)
+														}
+													>
+														<SelectTrigger>
+															<SelectValue placeholder="Select format" />
+														</SelectTrigger>
+														<SelectContent>
+															<SelectItem value="mp3">MP3</SelectItem>
+															<SelectItem value="aac">AAC</SelectItem>
+															<SelectItem value="flac">FLAC</SelectItem>
+															<SelectItem value="m4a">M4A</SelectItem>
+															<SelectItem value="opus">Opus</SelectItem>
+															<SelectItem value="vorbis">Vorbis</SelectItem>
+															<SelectItem value="wav">WAV</SelectItem>
+														</SelectContent>
+													</Select>
+												</div>
+											)}
+										</form.Field>
+
+										<form.Field
+											name="audioQuality"
+											validators={{
+												onChange: ({ value }) =>
+													!value ? "Audio quality is required" : undefined,
+											}}
+										>
+											{(field) => (
+												<div className="space-y-3">
+													<Label htmlFor={field.name} className="font-medium">
+														Audio Quality
+													</Label>
+													<Select
+														value={field.state.value}
+														onValueChange={(value) => field.handleChange(value)}
+													>
+														<SelectTrigger>
+															<SelectValue placeholder="Select quality" />
+														</SelectTrigger>
+														<SelectContent>
+															<SelectItem value="0">Best (0)</SelectItem>
+															<SelectItem value="1">Excellent (1)</SelectItem>
+															<SelectItem value="2">Very Good (2)</SelectItem>
+															<SelectItem value="3">Good (3)</SelectItem>
+															<SelectItem value="4">Fair (4)</SelectItem>
+															<SelectItem value="5">Average (5)</SelectItem>
+															<SelectItem value="6">
+																Below Average (6)
+															</SelectItem>
+															<SelectItem value="7">Poor (7)</SelectItem>
+															<SelectItem value="8">Very Poor (8)</SelectItem>
+															<SelectItem value="9">Worst (9)</SelectItem>
+															<SelectItem value="10">Lowest (10)</SelectItem>
+															<SelectItem value="64K">64K</SelectItem>
+															<SelectItem value="128K">128K</SelectItem>
+															<SelectItem value="192K">
+																192K (Default)
+															</SelectItem>
+															<SelectItem value="256K">256K</SelectItem>
+															<SelectItem value="320K">320K</SelectItem>
+														</SelectContent>
+													</Select>
+												</div>
+											)}
+										</form.Field>
+									</div>
+
+									<form.Field
+										name="startSeconds"
+										validators={{
+											onChange: ({ value }) => {
+												const endTime = form.state.values.endSeconds;
+												const duration = endTime - value;
+												return value < 0
+													? "Start time must be 0 or greater"
+													: duration < 5
+														? "Duration must be at least 5 seconds"
+														: duration > 60
+															? "Duration cannot exceed 60 seconds"
+															: videoInfo && value >= videoInfo.duration
+																? "Start time cannot exceed video duration"
+																: undefined;
+											},
+										}}
+									>
 										{(field) => (
 											<TimeRangeSlider
 												startTime={field.state.value}
@@ -411,7 +543,7 @@ function RouteComponent() {
 									Your Ringtone is Ready!
 								</h3>
 								<p className="text-muted-foreground text-sm">
-									{activeRingtone.fileName}.mp3
+									{activeRingtone.fileName}
 								</p>
 							</div>
 							<Button
@@ -432,7 +564,7 @@ function RouteComponent() {
 								onClick={() => {
 									const link = document.createElement("a");
 									link.href = activeRingtone.downloadUrl;
-									link.download = `${activeRingtone.fileName}.mp3`;
+									link.download = activeRingtone.fileName;
 									document.body.appendChild(link);
 									link.click();
 									document.body.removeChild(link);

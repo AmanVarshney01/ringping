@@ -9,6 +9,8 @@ export const ringtone = sqliteTable("ringtone", {
 	startTime: integer("start_time").notNull(),
 	endTime: integer("end_time").notNull(),
 	downloadUrl: text("download_url").notNull(),
+	audioFormat: text("audio_format").notNull().default("mp3"),
+	audioQuality: text("audio_quality").notNull().default("192K"),
 	userId: text("user_id")
 		.notNull()
 		.references(() => user.id, { onDelete: "cascade" }),

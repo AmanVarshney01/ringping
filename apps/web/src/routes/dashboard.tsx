@@ -53,6 +53,8 @@ function DashboardComponent() {
 	const [deletingRingtone, setDeletingRingtone] = useState<{
 		id: string;
 		fileName: string;
+		downloadUrl: string;
+		audioFormat?: string;
 	} | null>(null);
 	const [editFileName, setEditFileName] = useState("");
 	const [showPlayerDialog, setShowPlayerDialog] = useState(false);
@@ -117,7 +119,12 @@ function DashboardComponent() {
 		});
 	};
 
-	const handleDelete = (ringtone: { id: string; fileName: string }) => {
+	const handleDelete = (ringtone: {
+		id: string;
+		fileName: string;
+		downloadUrl: string;
+		audioFormat?: string;
+	}) => {
 		setDeletingRingtone(ringtone);
 	};
 
@@ -186,7 +193,13 @@ function DashboardComponent() {
 										<TableCell className="font-medium">
 											<div className="flex items-center space-x-2">
 												<Music className="h-4 w-4 text-muted-foreground" />
-												<span>{ringtone.fileName}.mp3</span>
+												<span>
+													{ringtone.fileName}.
+													{(ringtone as any).audioFormat ||
+														ringtone.downloadUrl.substring(
+															ringtone.downloadUrl.lastIndexOf(".") + 1,
+														)}
+												</span>
 											</div>
 										</TableCell>
 										<TableCell>
@@ -244,7 +257,14 @@ function DashboardComponent() {
 												<Button
 													variant="outline"
 													size="sm"
-													onClick={() => handleDelete(ringtone)}
+													onClick={() =>
+														handleDelete({
+															id: ringtone.id,
+															fileName: ringtone.fileName,
+															downloadUrl: ringtone.downloadUrl,
+															audioFormat: (ringtone as any).audioFormat,
+														})
+													}
 													className="text-red-600 hover:text-red-700"
 												>
 													<Trash2 className="h-4 w-4" />
@@ -328,7 +348,16 @@ function DashboardComponent() {
 						<DialogTitle>Delete Ringtone</DialogTitle>
 						<DialogDescription>
 							Are you sure you want to delete "{deletingRingtone?.fileName}
-							.mp3"? This action cannot be undone.
+							{deletingRingtone
+								? `.${
+										deletingRingtone.audioFormat ||
+										deletingRingtone.downloadUrl?.substring(
+											deletingRingtone.downloadUrl.lastIndexOf(".") + 1,
+										) ||
+										"mp3"
+									}`
+								: ""}
+							"? This action cannot be undone.
 						</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>

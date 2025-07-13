@@ -2,7 +2,7 @@ import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 import { Music, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import z from "zod/v4";
+import z from "zod";
 import { authClient } from "@/lib/auth-client";
 import Loader from "./loader";
 import { Button } from "./ui/button";

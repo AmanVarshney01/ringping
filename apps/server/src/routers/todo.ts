@@ -1,6 +1,6 @@
 import { consola } from "consola";
 import { eq } from "drizzle-orm";
-import z from "zod/v4";
+import z from "zod";
 import { db } from "../db";
 import { todo } from "../db/schema/todo";
 import { publicProcedure } from "../lib/orpc";
