@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { LayoutDashboard } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { ThemeToggle } from "./theme-toggle";
 import UserMenu from "./user-menu";
@@ -29,7 +28,6 @@ export default function Header() {
 									className: "text-primary",
 								}}
 							>
-								<LayoutDashboard className="h-4 w-4" />
 								<span>Dashboard</span>
 							</Link>
 						</nav>

@@ -12,7 +12,7 @@ export function YoutubePlayer({
 	onStateChange,
 }: YoutubePlayerProps) {
 	const aspectRatio = 16 / 9;
-	const width = 550;
+	const width = 600;
 	const height = Math.round(width / aspectRatio);
 
 	const opts: YouTubeProps["opts"] = {

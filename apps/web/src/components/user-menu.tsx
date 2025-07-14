@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { LogOut, User } from "lucide-react";
+import { LogOut } from "lucide-react";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -32,7 +32,6 @@ export default function UserMenu() {
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<Button variant="outline" className="flex h-10 items-center space-x-2">
-					<User className="h-4 w-4" />
 					<span>{session.user.name}</span>
 				</Button>
 			</DropdownMenuTrigger>

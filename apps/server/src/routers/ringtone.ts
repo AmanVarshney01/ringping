@@ -8,34 +8,6 @@ import { db } from "../db";
 import { ringtone } from "../db/schema/ringtone";
 import { protectedProcedure } from "../lib/orpc";
 
-const generateUniqueFileName = async (
-	baseName: string,
-	userId: string,
-): Promise<string> => {
-	const existingNames = await db
-		.select({ fileName: ringtone.fileName })
-		.from(ringtone)
-		.where(eq(ringtone.userId, userId));
-
-	const existingSet = new Set(
-		existingNames.map((r) => r.fileName.toLowerCase()),
-	);
-
-	if (!existingSet.has(baseName.toLowerCase())) {
-		return baseName;
-	}
-
-	let counter = 1;
-	let uniqueName = `${baseName} ${counter}`;
-
-	while (existingSet.has(uniqueName.toLowerCase())) {
-		counter++;
-		uniqueName = `${baseName} ${counter}`;
-	}
-
-	return uniqueName;
-};
-
 const getVideoInfo = protectedProcedure
 	.input(
 		z.object({
@@ -140,14 +112,12 @@ const createRingtone = protectedProcedure
 			});
 		}
 
-		const uniqueFileName = await generateUniqueFileName(fileName, userId);
-
 		const outputDir = path.join(process.cwd(), "public", "downloads", userId);
 		await fs.mkdir(outputDir, { recursive: true });
 
 		const ringtoneId = crypto.randomUUID();
-		const outputPath = path.join(outputDir, `${uniqueFileName}.${audioFormat}`);
-		const downloadUrl = `/downloads/${userId}/${uniqueFileName}.${audioFormat}`;
+		const outputPath = path.join(outputDir, `${ringtoneId}.${audioFormat}`);
+		const downloadUrl = `/downloads/${userId}/${ringtoneId}.${audioFormat}`;
 
 		const formatTime = (seconds: number) => {
 			const h = Math.floor(seconds / 3600);
@@ -221,7 +191,7 @@ const createRingtone = protectedProcedure
 
 		await db.insert(ringtone).values({
 			id: ringtoneId,
-			fileName: uniqueFileName,
+			fileName: fileName,
 			originalUrl: url,
 			startTime: startSeconds,
 			endTime: endSeconds,
@@ -280,12 +250,10 @@ const updateRingtone = protectedProcedure
 			});
 		}
 
-		const uniqueFileName = await generateUniqueFileName(fileName, userId);
-
 		await db
 			.update(ringtone)
 			.set({
-				fileName: uniqueFileName,
+				fileName: fileName,
 				updatedAt: new Date(),
 			})
 			.where(eq(ringtone.id, id));

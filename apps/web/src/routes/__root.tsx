@@ -9,12 +9,12 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import Loader from "@/components/loader";
+import { ThemeProvider } from "@/components/theme-provider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Toaster } from "@/components/ui/sonner";
 import type { orpc } from "@/utils/orpc";
 import Header from "../components/header";
 import appCss from "../index.css?url";
-import { ThemeProvider } from "@/components/theme-provider";
 export interface RouterAppContext {
 	orpc: typeof orpc;
 	queryClient: QueryClient;

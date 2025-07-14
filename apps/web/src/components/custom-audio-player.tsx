@@ -1,5 +1,3 @@
-/** biome-ignore-all lint/suspicious/noArrayIndexKey: <explanation> */
-
 import { Howl } from "howler";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import * as React from "react";

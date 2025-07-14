@@ -32,12 +32,11 @@ export const TimeRangeSlider = ({
 	const [zoomCenter, setZoomCenter] = useState(0);
 	const trackRef = useRef<HTMLSpanElement>(null);
 
-	// Calculate zoom window size based on video duration
 	const getZoomWindowSize = () => {
-		if (maxDuration <= 60) return Math.min(maxDuration * 0.3, 20); // 30% for short videos, max 20s
-		if (maxDuration <= 300) return Math.min(maxDuration * 0.2, 60); // 20% for medium videos, max 60s
-		if (maxDuration <= 3600) return Math.min(maxDuration * 0.1, 300); // 10% for long videos, max 300s
-		return Math.min(maxDuration * 0.05, 600); // 5% for very long videos, max 600s
+		if (maxDuration <= 60) return Math.min(maxDuration * 0.3, 20);
+		if (maxDuration <= 300) return Math.min(maxDuration * 0.2, 60);
+		if (maxDuration <= 3600) return Math.min(maxDuration * 0.1, 300);
+		return Math.min(maxDuration * 0.05, 600);
 	};
 
 	const zoomWindowSize = getZoomWindowSize();
@@ -234,12 +233,11 @@ export const TimeRangeSlider = ({
 
 	const sliderValues = getSliderValues();
 
-	// Calculate step size for better precision across all video lengths
 	const getStepSize = () => {
-		if (maxDuration <= 60) return 0.1; // 0.1s for short videos
-		if (maxDuration <= 300) return 0.5; // 0.5s for medium videos
-		if (maxDuration <= 3600) return 1; // 1s for long videos
-		return Math.max(1, Math.floor(maxDuration / 10000)); // Dynamic for very long videos
+		if (maxDuration <= 60) return 0.1;
+		if (maxDuration <= 300) return 0.5;
+		if (maxDuration <= 3600) return 1;
+		return Math.max(1, Math.floor(maxDuration / 10000));
 	};
 
 	return (

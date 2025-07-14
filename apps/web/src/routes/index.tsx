@@ -241,10 +241,8 @@ function RouteComponent() {
 		return <Loader />;
 	}
 
-	// const hasUrl = videoUrl.trim().length > 0;
-
 	return (
-		<div className="h-full">
+		<div className="flex flex-col justify-center">
 			<div className="">
 				<AnimatePresence>
 					{!videoInfo && (
@@ -253,13 +251,22 @@ function RouteComponent() {
 							animate={{ opacity: 1, y: 0 }}
 							exit={{ opacity: 0, y: -20 }}
 							transition={{ duration: 0.5 }}
-							className="mb-12 text-center"
+							className="mt-20 mb-12 w-full text-center"
 						>
-							<h1 className="mb-4 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text font-bold text-4xl text-transparent">
-								RingTone Creator
+							<h1 className="mb-2 font-semibold text-3xl text-primary">
+								YouTube Ringtone Maker
 							</h1>
-							<p className="text-lg text-muted-foreground">
-								Transform YouTube videos into custom ringtones
+							<p className="mx-auto max-w-md text-muted-foreground text-sm">
+								A{" "}
+								<a
+									href="https://better-t-stack.dev/"
+									className="underline hover:text-primary"
+									target="_blank"
+									rel="noopener"
+								>
+									Better-T-Stack
+								</a>{" "}
+								Demo
 							</p>
 						</motion.div>
 					)}
@@ -270,35 +277,21 @@ function RouteComponent() {
 						e.preventDefault();
 						form.handleSubmit();
 					}}
-					className="space-y-8"
+					className="w-full space-y-8"
 				>
-					<form.Field
-						name="url"
-						asyncDebounceMs={500}
-						validators={{
-							onChange: ({ value }) =>
-								!value
-									? "URL is required"
-									: !/^https?:\/\/.+/.test(value)
-										? "Please enter a valid URL"
-										: undefined,
-						}}
-					>
+					<form.Field name="url">
 						{(field) => (
-							<div className="space-y-3">
+							<div className="w-full space-y-3">
 								<Input
 									id={field.name}
 									name={field.name}
 									type="url"
-									placeholder="https://www.youtube.com/watch?v=..."
+									placeholder="Paste a YouTube video link here..."
 									value={videoUrl}
 									onBlur={field.handleBlur}
 									onChange={(e) => handleUrlChange(e.target.value)}
-									className="h-12"
+									className="h-12 w-full"
 								/>
-								{!field.state.meta.isValid && (
-									<em role="alert">{field.state.meta.errors.join(", ")}</em>
-								)}
 							</div>
 						)}
 					</form.Field>
@@ -311,7 +304,7 @@ function RouteComponent() {
 								transition={{ duration: 0.2, delay: 0.5 }}
 								className="grid grid-cols-1 gap-8 md:grid-cols-2"
 							>
-								<div>
+								<div className="grid h-full grid-rows-[auto_1fr]">
 									<div className="space-y-4">
 										<div className="flex items-center space-x-4">
 											{videoInfo.thumbnail && (
@@ -335,7 +328,7 @@ function RouteComponent() {
 										</div>
 									</div>
 									{videoId && (
-										<div className="mt-4">
+										<div className="mt-4 h-full">
 											<YoutubePlayer
 												videoId={videoId}
 												onReady={(e) => {
